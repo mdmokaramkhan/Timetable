@@ -1,0 +1,206 @@
+package com.mukrram.timetable.ui.screens.onboarding
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoGraph
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.mukrram.timetable.data.di.ServiceLocator
+import com.mukrram.timetable.navigation.AuthRoutes
+import com.mukrram.timetable.ui.theme.AppSpacing
+import kotlinx.coroutines.launch
+
+private data class OnboardingPage(
+    val title: String,
+    val body: String,
+    val icon: ImageVector,
+)
+
+private val pages = listOf(
+    OnboardingPage(
+        title = "A joyful way to plan",
+        body = "Keep batches, faculty, and rooms in one clean flow - then generate conflict-aware schedules in seconds.",
+        icon = Icons.Filled.CalendarMonth,
+    ),
+    OnboardingPage(
+        title = "See everything clearly",
+        body = "Track progress from the dashboard and keep your core data tidy before each generation run.",
+        icon = Icons.Filled.AutoGraph,
+    ),
+    OnboardingPage(
+        title = "Share the right view",
+        body = "Generate options, save your best fit, and browse timetables by batch, faculty, or room view.",
+        icon = Icons.Filled.Groups,
+    ),
+    OnboardingPage(
+        title = "Ready when you are",
+        body = "Sign in and sync with your server. Faculty see personal schedules while admins manage the whole system.",
+        icon = Icons.AutoMirrored.Filled.Login,
+    ),
+)
+
+@Composable
+fun OnboardingScreen(
+    navController: NavController,
+    modifier: Modifier = Modifier,
+) {
+    val repository = ServiceLocator.repository
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { pages.size })
+
+    fun finishToLogin() {
+        scope.launch {
+            repository.setHasCompletedOnboarding(true)
+            navController.navigate(AuthRoutes.Login) {
+                popUpTo(AuthRoutes.Onboarding) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = AppSpacing.xl),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = AppSpacing.lg, bottom = AppSpacing.sm),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { finishToLogin() }) {
+                    Text("Skip")
+                }
+            }
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) { page ->
+                val item = pages[page]
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
+                        shape = CircleShape,
+                        modifier = Modifier.size(108.dp),
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = null,
+                            modifier = Modifier.padding(AppSpacing.xl),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(AppSpacing.md))
+                    Icon(
+                        imageVector = Icons.Filled.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.height(AppSpacing.xl))
+                    AnimatedContent(
+                        targetState = item,
+                        label = "onboardingPageText",
+                    ) { state ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = state.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                            Spacer(modifier = Modifier.height(AppSpacing.md))
+                            Text(
+                                text = state.body,
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = AppSpacing.lg),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                pages.indices.forEach { index ->
+                    val selected = pagerState.currentPage == index
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .size(if (selected) 10.dp else 8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                            ),
+                    )
+                }
+            }
+
+            val lastPage = pagerState.currentPage == pages.lastIndex
+            Button(
+                onClick = {
+                    if (lastPage) {
+                        finishToLogin()
+                    } else {
+                        scope.launch {
+                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = AppSpacing.xxl),
+            ) {
+                Text(if (lastPage) "Get started" else "Continue")
+            }
+        }
+    }
+}
