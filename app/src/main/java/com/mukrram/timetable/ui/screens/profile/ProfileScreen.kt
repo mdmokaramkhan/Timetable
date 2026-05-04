@@ -1,5 +1,6 @@
 package com.mukrram.timetable.ui.screens.profile
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -48,9 +49,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.mukrram.timetable.R
 import com.mukrram.timetable.navigation.ExtraRoutes
 import com.mukrram.timetable.ui.LocalAppViewModelFactory
 import com.mukrram.timetable.ui.components.AppButton
@@ -71,21 +74,6 @@ fun ProfileScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TimetableTopAppBar(
-                titleText = "The Academic Curator",
-                navigationIcon = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.AutoMirrored.Outlined.MenuOpen, contentDescription = "Menu")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { navController.navigate(ExtraRoutes.Notifications) }) {
-                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications")
-                    }
-                },
-            )
-        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -194,11 +182,10 @@ private fun ProfileHeroCard(
                     .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Person,
+                Image(
+                    painter = painterResource(id = R.drawable.profile),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(92.dp),
                 )
             }
             Surface(

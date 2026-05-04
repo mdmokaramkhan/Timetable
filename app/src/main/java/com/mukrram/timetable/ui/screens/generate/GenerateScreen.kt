@@ -108,16 +108,6 @@ fun GenerateScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TimetableTopAppBar(
-                titleText = "Generate Timetable",
-                actions = {
-                    IconButton(onClick = { viewModel.refreshSummary() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh data")
-                    }
-                },
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         AppPullToRefreshBox(

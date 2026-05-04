@@ -16,12 +16,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoGraph
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,12 +32,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.mukrram.timetable.data.di.ServiceLocator
 import com.mukrram.timetable.navigation.AuthRoutes
+import com.mukrram.timetable.ui.components.AppButton
 import com.mukrram.timetable.ui.theme.AppSpacing
+import com.mukrram.timetable.ui.theme.TimetableTheme
 import kotlinx.coroutines.launch
 
 private data class OnboardingPage(
@@ -77,24 +81,39 @@ fun OnboardingScreen(
 ) {
     val repository = ServiceLocator.repository
     val scope = rememberCoroutineScope()
+
+    OnboardingScreenContent(
+        onFinish = {
+            scope.launch {
+                repository.setHasCompletedOnboarding(true)
+                navController.navigate(AuthRoutes.Login) {
+                    popUpTo(AuthRoutes.Onboarding) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun OnboardingScreenContent(
+    onFinish: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { pages.size })
 
-    fun finishToLogin() {
-        scope.launch {
-            repository.setHasCompletedOnboarding(true)
-            navController.navigate(AuthRoutes.Login) {
-                popUpTo(AuthRoutes.Onboarding) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
-    }
-
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = AppSpacing.xl),
         ) {
+            // Top Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -102,11 +121,18 @@ fun OnboardingScreen(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { finishToLogin() }) {
-                    Text("Skip")
+                TextButton(onClick = onFinish) {
+                    Text(
+                        "Skip",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
                 }
             }
 
+            // Pager
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -119,26 +145,44 @@ fun OnboardingScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
-                        shape = CircleShape,
-                        modifier = Modifier.size(108.dp),
+                    // Styled Icon Container
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(160.dp)
                     ) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = null,
-                            modifier = Modifier.padding(AppSpacing.xl),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            modifier = Modifier.size(140.dp)
+                        ) {}
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(100.dp),
+                            shadowElevation = 6.dp
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(AppSpacing.xl),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(AppSpacing.md))
+
+                    Spacer(modifier = Modifier.height(AppSpacing.xxl))
+
                     Icon(
                         imageVector = Icons.Filled.AutoAwesome,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
+                        modifier = Modifier.size(24.dp),
                     )
+
                     Spacer(modifier = Modifier.height(AppSpacing.xl))
+
                     AnimatedContent(
                         targetState = item,
                         label = "onboardingPageText",
@@ -146,7 +190,10 @@ fun OnboardingScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = state.title,
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = (-0.5).sp
+                                ),
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onBackground,
                             )
@@ -156,12 +203,14 @@ fun OnboardingScreen(
                                 style = MaterialTheme.typography.bodyLarge,
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = AppSpacing.md)
                             )
                         }
                     }
                 }
             }
 
+            // Indicator
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -184,11 +233,12 @@ fun OnboardingScreen(
                 }
             }
 
+            // Bottom Button
             val lastPage = pagerState.currentPage == pages.lastIndex
-            Button(
+            AppButton(
                 onClick = {
                     if (lastPage) {
-                        finishToLogin()
+                        onFinish()
                     } else {
                         scope.launch {
                             pagerState.animateScrollToPage(pagerState.currentPage + 1)
@@ -197,10 +247,24 @@ fun OnboardingScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = AppSpacing.xxl),
+                    .height(56.dp),
+                shape = MaterialTheme.shapes.large
             ) {
-                Text(if (lastPage) "Get started" else "Continue")
+                Text(
+                    if (lastPage) "Get Started" else "Continue",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
             }
+            
+            Spacer(modifier = Modifier.height(AppSpacing.xxl))
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun OnboardingScreenPreview() {
+    TimetableTheme {
+        OnboardingScreenContent(onFinish = {})
     }
 }

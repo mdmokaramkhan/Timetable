@@ -1,5 +1,6 @@
 package com.mukrram.timetable.ui.screens.manage
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,10 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,11 +21,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.automirrored.outlined.MenuOpen
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.MeetingRoom
@@ -53,11 +54,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.mukrram.timetable.navigation.ExtraRoutes
+import com.mukrram.timetable.navigation.MainDestination
 import com.mukrram.timetable.data.remote.dto.BatchDto
 import com.mukrram.timetable.data.remote.dto.FacultyDto
 import com.mukrram.timetable.data.remote.dto.RoomDto
@@ -78,7 +90,10 @@ import com.mukrram.timetable.ui.viewmodel.SubjectManageViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ManageScreen(modifier: Modifier = Modifier) {
+fun ManageScreen(
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
     var tabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("Faculty", "Subjects", "Rooms", "Batches")
 
@@ -89,22 +104,8 @@ fun ManageScreen(modifier: Modifier = Modifier) {
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TimetableTopAppBar(
-                titleText = "The Academic Curator",
-                navigationIcon = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.AutoMirrored.Outlined.MenuOpen, contentDescription = "Menu")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications")
-                    }
-                },
-            )
-        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -115,13 +116,16 @@ fun ManageScreen(modifier: Modifier = Modifier) {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
                 Text(
-                    text = "Manage Resources",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                    text = "Resource Management",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.8).sp
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Keep faculty, subjects, rooms, and batches up to date.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Configure your academic workspace",
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -139,8 +143,9 @@ fun ManageScreen(modifier: Modifier = Modifier) {
                         color = if (selected) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surfaceContainerLow
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         },
+                        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     ) {
                         Text(
                             text = title,
@@ -151,7 +156,7 @@ fun ManageScreen(modifier: Modifier = Modifier) {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                         )
                     }
                 }
@@ -223,7 +228,6 @@ private fun FacultyTab(vm: FacultyManageViewModel) {
                     title = "Faculty Management",
                     description = "Manage faculty profiles, subject expertise, and weekly teaching capacity.",
                     count = state.items.size,
-                    icon = Icons.Outlined.Person,
                     accentColor = MaterialTheme.colorScheme.primary,
                 )
                 AppOutlinedTextField(
@@ -261,15 +265,7 @@ private fun FacultyTab(vm: FacultyManageViewModel) {
                                 EntityCard(
                                     title = item.name,
                                     subtitle = "Max load: ${item.maxLoad} lectures/week",
-                                    supportingInfo = buildString {
-                                        val subs = item.subjects.orEmpty()
-                                        append("Subjects: ${subs.size}")
-                                        if (subs.isNotEmpty()) {
-                                            append(" • ")
-                                            append(subs.take(2).joinToString(", "))
-                                            if (subs.size > 2) append(" +${subs.size - 2}")
-                                        }
-                                    },
+                                    supportingInfo = item.subjects?.joinToString(", ") ?: "No subjects assigned",
                                     onEdit = {
                                         editing = item
                                         showForm = true
@@ -278,7 +274,7 @@ private fun FacultyTab(vm: FacultyManageViewModel) {
                                     icon = Icons.Outlined.Person,
                                     accentColor = MaterialTheme.colorScheme.primary,
                                     badge = "Faculty",
-                                    extraTag = "ID ${item.id.takeLast(4)}",
+                                    extraTag = "ID: ${item.id.takeLast(6).uppercase()}",
                                 )
                             }
                         }
@@ -475,7 +471,6 @@ private fun SubjectTab(vm: SubjectManageViewModel) {
                     title = "Subject Catalog",
                     description = "Define courses and lectures per week for better timetable accuracy.",
                     count = state.items.size,
-                    icon = Icons.AutoMirrored.Outlined.MenuBook,
                     accentColor = MaterialTheme.colorScheme.tertiary,
                 )
                 AppOutlinedTextField(
@@ -508,8 +503,8 @@ private fun SubjectTab(vm: SubjectManageViewModel) {
                             items(filtered, key = { it.id }) { item ->
                                 EntityCard(
                                     title = item.name,
-                                    subtitle = "${item.lecturesPerWeek} lectures per week",
-                                    supportingInfo = "Subject ID: ${item.id.takeLast(6)}",
+                                    subtitle = "${item.lecturesPerWeek} lectures / week",
+                                    supportingInfo = "Standard weekly engagement required for this course across all assigned batches.",
                                     onEdit = {
                                         editing = item
                                         showForm = true
@@ -518,7 +513,7 @@ private fun SubjectTab(vm: SubjectManageViewModel) {
                                     icon = Icons.AutoMirrored.Outlined.MenuBook,
                                     accentColor = MaterialTheme.colorScheme.tertiary,
                                     badge = "Subject",
-                                    extraTag = "LPW ${item.lecturesPerWeek}",
+                                    extraTag = "ID: ${item.id.takeLast(6).uppercase()}",
                                 )
                             }
                         }
@@ -691,7 +686,6 @@ private fun RoomTab(vm: RoomManageViewModel) {
                     title = "Room Inventory",
                     description = "Track room details and type so classes map to the right spaces.",
                     count = state.items.size,
-                    icon = Icons.Outlined.MeetingRoom,
                     accentColor = MaterialTheme.colorScheme.secondary,
                 )
                 AppOutlinedTextField(
@@ -725,7 +719,7 @@ private fun RoomTab(vm: RoomManageViewModel) {
                                 EntityCard(
                                     title = item.name,
                                     subtitle = item.type,
-                                    supportingInfo = "Room ID: ${item.id.takeLast(6)}",
+                                    supportingInfo = "Designated physical space for ${item.type.lowercase()} sessions and academic activities.",
                                     onEdit = {
                                         editing = item
                                         showForm = true
@@ -734,7 +728,7 @@ private fun RoomTab(vm: RoomManageViewModel) {
                                     icon = Icons.Outlined.MeetingRoom,
                                     accentColor = MaterialTheme.colorScheme.secondary,
                                     badge = item.type,
-                                    extraTag = "Room",
+                                    extraTag = "ID: ${item.id.takeLast(6).uppercase()}",
                                 )
                             }
                         }
@@ -904,7 +898,6 @@ private fun BatchTab(vm: BatchManageViewModel) {
                     title = "Batch Details",
                     description = "Maintain batches and departments before generating the timetable.",
                     count = state.items.size,
-                    icon = Icons.Outlined.Groups,
                     accentColor = MaterialTheme.colorScheme.primary,
                 )
                 AppOutlinedTextField(
@@ -938,7 +931,7 @@ private fun BatchTab(vm: BatchManageViewModel) {
                                 EntityCard(
                                     title = item.name,
                                     subtitle = item.department,
-                                    supportingInfo = "Batch ID: ${item.id.takeLast(6)}",
+                                    supportingInfo = "Official academic cohort belonging to the ${item.department} department.",
                                     onEdit = {
                                         editing = item
                                         showForm = true
@@ -947,7 +940,7 @@ private fun BatchTab(vm: BatchManageViewModel) {
                                     icon = Icons.Outlined.Groups,
                                     accentColor = MaterialTheme.colorScheme.primary,
                                     badge = item.department,
-                                    extraTag = "Batch",
+                                    extraTag = "ID: ${item.id.takeLast(6).uppercase()}",
                                 )
                             }
                         }
@@ -1069,90 +1062,153 @@ private fun EntityCard(
     badge: String,
     extraTag: String,
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     AppCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(0.5.dp, MaterialTheme.shapes.large),
+        onClick = { expanded = !expanded },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AppSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-        ) {
+        Column {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(AppSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(accentColor.copy(alpha = 0.14f)),
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.08f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = accentColor,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(AppSpacing.md))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = accentColor.copy(alpha = 0.12f),
-                        ) {
-                            Text(
-                                text = badge,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = accentColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ) {
-                            Text(
-                                text = extraTag,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            )
-                        }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        letterSpacing = (-0.2).sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+                    ) {
+                        val displayBadge = if (badge.length > 15) badge.take(13) + "..." else badge
+                        Text(
+                            text = displayBadge,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = accentColor,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    IconButton(onClick = onEdit) {
+
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
                             Icons.Filled.Edit,
                             contentDescription = "Edit",
-                            tint = accentColor,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
-                    IconButton(onClick = onDelete) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
                             Icons.Filled.Delete,
                             contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error,
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
             }
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                supportingInfo,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppSpacing.md)
+                        .padding(bottom = AppSpacing.md)
+                        .padding(start = 56.dp),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
+                ) {
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    
+                    if (extraTag.isNotBlank()) {
+                        EntityInfoRow(label = "Reference", value = extraTag)
+                    }
+                    if (supportingInfo.isNotBlank()) {
+                        val label = when (badge) {
+                            "Faculty" -> "Expertise"
+                            "Subject" -> "Standard Policy"
+                            else -> "Description"
+                        }
+                        EntityInfoRow(label = label, value = supportingInfo)
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun EntityInfoRow(label: String, value: String) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 16.sp
+        )
     }
 }
 
@@ -1161,41 +1217,152 @@ private fun ManageSectionHeader(
     title: String,
     description: String,
     count: Int,
-    icon: ImageVector,
     accentColor: Color,
 ) {
-    AppCard(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = AppSpacing.xs),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            .padding(vertical = AppSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AppSpacing.md),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = accentColor)
-            Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                letterSpacing = (-0.4).sp
+            )
+            Surface(
+                shape = CircleShape,
+                color = accentColor.copy(alpha = 0.1f),
+            ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = count.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
                 )
             }
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 16.sp
+        )
     }
 }
+
+//@Previews of every component
+
+@Preview(showBackground = true, name = "Light Mode")
+@Composable
+fun ManageScreenPreview() {
+    val navController = androidx.navigation.compose.rememberNavController()
+    com.mukrram.timetable.ui.theme.TimetableTheme(darkTheme = false) {
+        ManageScreen(navController = navController)
+    }
+}
+
+@Preview(showBackground = true, name = "Dark Mode")
+@Composable
+fun ManageScreenDarkPreview() {
+    val navController = androidx.navigation.compose.rememberNavController()
+    com.mukrram.timetable.ui.theme.TimetableTheme(darkTheme = true) {
+        ManageScreen(navController = navController)
+    }
+}
+
+@Preview(showBackground = true, name = "Faculty Card Light")
+@Composable
+fun FacultyCardPreview() {
+    com.mukrram.timetable.ui.theme.TimetableTheme(darkTheme = false) {
+        EntityCard(
+            title = "Dr. Sharma",
+            subtitle = "Max load: 12 lectures/week",
+            supportingInfo = "Subjects: DSA, OS, DBMS",
+            onEdit = {},
+            onDelete = {},
+            icon = Icons.Outlined.Person,
+            accentColor = MaterialTheme.colorScheme.primary,
+            badge = "Faculty",
+            extraTag = "ID 1234"
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Faculty Card Dark")
+@Composable
+fun FacultyCardDarkPreview() {
+    com.mukrram.timetable.ui.theme.TimetableTheme(darkTheme = true) {
+        EntityCard(
+            title = "Dr. Sharma",
+            subtitle = "Max load: 12 lectures/week",
+            supportingInfo = "Subjects: DSA, OS, DBMS",
+            onEdit = {},
+            onDelete = {},
+            icon = Icons.Outlined.Person,
+            accentColor = MaterialTheme.colorScheme.primary,
+            badge = "Faculty",
+            extraTag = "ID 1234"
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Subject Card")
+@Composable
+fun SubjectCardPreview() {
+    com.mukrram.timetable.ui.theme.TimetableTheme {
+        EntityCard(
+            title = "Data Structures",
+            subtitle = "4 lectures per week",
+            supportingInfo = "Subject ID: SUB123",
+            onEdit = {},
+            onDelete = {},
+            icon = Icons.AutoMirrored.Outlined.MenuBook,
+            accentColor = MaterialTheme.colorScheme.tertiary,
+            badge = "Subject",
+            extraTag = "LPW 4"
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Room Card")
+@Composable
+fun RoomCardPreview() {
+    com.mukrram.timetable.ui.theme.TimetableTheme {
+        EntityCard(
+            title = "Lab 204",
+            subtitle = "Computer Lab",
+            supportingInfo = "Room ID: RM204",
+            onEdit = {},
+            onDelete = {},
+            icon = Icons.Outlined.MeetingRoom,
+            accentColor = MaterialTheme.colorScheme.secondary,
+            badge = "Lab",
+            extraTag = "Room"
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Batch Card")
+@Composable
+fun BatchCardPreview() {
+    com.mukrram.timetable.ui.theme.TimetableTheme {
+        EntityCard(
+        title = "CSE 3rd Year",
+        subtitle = "Computer Science",
+        supportingInfo = "Batch ID: B12345",
+        onEdit = {},
+        onDelete = {},
+        icon = Icons.Outlined.Groups,
+        accentColor = MaterialTheme.colorScheme.primary,
+        badge = "CSE",
+        extraTag = "Batch"
+    )
+}}

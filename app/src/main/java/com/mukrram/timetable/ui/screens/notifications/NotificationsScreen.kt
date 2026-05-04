@@ -60,16 +60,16 @@ fun NotificationsScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TimetableTopAppBar(
-                titleText = "Notifications",
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
+//        topBar = {
+//            TimetableTopAppBar(
+//                titleText = "Notifications",
+//                navigationIcon = {
+//                    IconButton(onClick = { navController.navigateUp() }) {
+//                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+//                    }
+//                },
+//            )
+//        },
     ) { padding ->
         Column(
             modifier = Modifier
