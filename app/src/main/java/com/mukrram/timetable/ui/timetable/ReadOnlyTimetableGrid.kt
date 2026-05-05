@@ -79,8 +79,8 @@ fun ReadOnlyTimetableGrid(
     /** When false for a slot, cell shows placeholder (masked lens). Usually leave default. */
     isCellDisplayed: (ScheduleCellDto?) -> Boolean = { true },
     onSlotClick: ((day: String, slot: String, cell: ScheduleCellDto?) -> Unit)? = null,
-    /** Width of row header column (slot labels). */
-    rowHeaderWidth: Dp = 40.dp,
+    /** Width of row header column (slot labels, e.g. 09:00). */
+    rowHeaderWidth: Dp = 56.dp,
     /** Uniform width of each day column. */
     dayColumnWidth: Dp = 100.dp,
     /** Row height for each slot line. */
@@ -253,11 +253,12 @@ private fun GridRowHeaderSlot(
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
+                overflow = TextOverflow.Clip,
             )
         }
     }

@@ -2,6 +2,7 @@ package com.mukrram.timetable.data.repository
 
 import com.mukrram.timetable.data.local.AuthTokenStore
 import com.mukrram.timetable.data.local.TimetablePreferences
+import com.mukrram.timetable.data.model.AppThemeMode
 import com.mukrram.timetable.data.model.UserRole
 import com.mukrram.timetable.data.remote.JwtPayloadParser
 import com.mukrram.timetable.data.remote.SessionState
@@ -198,6 +199,18 @@ class TimetableRepository(
         withContext(Dispatchers.IO) {
             tokenStore.setToken(null)
             preferences.setAuthToken(null)
+        }
+
+    val themePreference: Flow<AppThemeMode> = preferences.themePreference
+
+    suspend fun setThemeMode(mode: AppThemeMode) =
+        withContext(Dispatchers.IO) {
+            preferences.setThemeMode(mode)
+        }
+
+    suspend fun clearTimetableCache() =
+        withContext(Dispatchers.IO) {
+            preferences.clearCachedTimetable()
         }
 
     val displayName: Flow<String> = preferences.displayName

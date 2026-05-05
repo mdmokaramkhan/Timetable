@@ -15,18 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.MeetingRoom
@@ -37,6 +31,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -55,21 +51,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.mukrram.timetable.navigation.ExtraRoutes
-import com.mukrram.timetable.navigation.MainDestination
 import com.mukrram.timetable.data.remote.dto.BatchDto
 import com.mukrram.timetable.data.remote.dto.FacultyDto
 import com.mukrram.timetable.data.remote.dto.RoomDto
@@ -87,19 +81,66 @@ import com.mukrram.timetable.ui.viewmodel.FacultyManageViewModel
 import com.mukrram.timetable.ui.viewmodel.RoomManageViewModel
 import com.mukrram.timetable.ui.viewmodel.SubjectManageViewModel
 
+private data class ManageTabStripItem(
+    val label: String,
+    val sectionTitle: String,
+    val sectionDescription: String,
+)
+
+private val manageTabItems = listOf(
+    ManageTabStripItem(
+        label = "Faculty",
+        sectionTitle = "Faculty Management",
+        sectionDescription = "Manage faculty profiles, subject expertise, and weekly teaching capacity.",
+    ),
+    ManageTabStripItem(
+        label = "Subjects",
+        sectionTitle = "Subject Catalog",
+        sectionDescription = "Define courses and lectures per week for better timetable accuracy.",
+    ),
+    ManageTabStripItem(
+        label = "Rooms",
+        sectionTitle = "Room Inventory",
+        sectionDescription = "Track room details and type so classes map to the right spaces.",
+    ),
+    ManageTabStripItem(
+        label = "Batches",
+        sectionTitle = "Batch Details",
+        sectionDescription = "Maintain batches and departments before generating the timetable.",
+    ),
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManageScreen(
     navController: NavController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    topBarSearchPulse: Int = 0,
 ) {
     var tabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Faculty", "Subjects", "Rooms", "Batches")
 
     val facultyVm: FacultyManageViewModel = viewModel(factory = LocalAppViewModelFactory.current)
     val subjectVm: SubjectManageViewModel = viewModel(factory = LocalAppViewModelFactory.current)
     val roomVm: RoomManageViewModel = viewModel(factory = LocalAppViewModelFactory.current)
     val batchVm: BatchManageViewModel = viewModel(factory = LocalAppViewModelFactory.current)
+
+    val facultyState by facultyVm.uiState.collectAsState()
+    val subjectState by subjectVm.uiState.collectAsState()
+    val roomState by roomVm.uiState.collectAsState()
+    val batchState by batchVm.uiState.collectAsState()
+
+    val tabMeta = manageTabItems[tabIndex]
+    val sectionCount = when (tabIndex) {
+        0 -> facultyState.items.size
+        1 -> subjectState.items.size
+        2 -> roomState.items.size
+        else -> batchState.items.size
+    }
+    val sectionAccent = when (tabIndex) {
+        0, 3 -> MaterialTheme.colorScheme.primary
+        1 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.secondary
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -111,69 +152,68 @@ fun ManageScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-                Text(
-                    text = "Resource Management",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.8).sp
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "Configure your academic workspace",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            PrimaryScrollableTabRow(
+                selectedTabIndex = tabIndex,
+                modifier = Modifier.fillMaxWidth(),
+                edgePadding = 0.dp,
             ) {
-                tabs.forEachIndexed { index, title ->
-                    val selected = tabIndex == index
-                    Surface(
+                manageTabItems.forEachIndexed { index, item ->
+                    Tab(
+                        selected = tabIndex == index,
                         onClick = { tabIndex = index },
-                        shape = CircleShape,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        text = {
+                            Text(
+                                text = item.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
                         },
-                        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    ) {
-                        Text(
-                            text = title,
-                            modifier = Modifier.padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm),
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        )
-                    }
+                    )
                 }
             }
-            when (tabIndex) {
-                0 -> FacultyTab(facultyVm)
-                1 -> SubjectTab(subjectVm)
-                2 -> RoomTab(roomVm)
-                else -> BatchTab(batchVm)
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+            )
+            ManageSectionHeader(
+                title = tabMeta.sectionTitle,
+                description = tabMeta.sectionDescription,
+                count = sectionCount,
+                accentColor = sectionAccent,
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                when (tabIndex) {
+                    0 -> FacultyTab(facultyVm, topBarSearchPulse = topBarSearchPulse)
+                    1 -> SubjectTab(subjectVm, topBarSearchPulse = topBarSearchPulse)
+                    2 -> RoomTab(roomVm, topBarSearchPulse = topBarSearchPulse)
+                    else -> BatchTab(batchVm, topBarSearchPulse = topBarSearchPulse)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FacultyTab(vm: FacultyManageViewModel) {
+private fun FacultyTab(
+    vm: FacultyManageViewModel,
+    topBarSearchPulse: Int = 0,
+) {
     val state by vm.uiState.collectAsState()
     var query by remember { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(topBarSearchPulse) {
+        if (topBarSearchPulse > 0) {
+            searchFocusRequester.requestFocus()
+        }
+    }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<FacultyDto?>(null) }
     var deleteTarget by remember { mutableStateOf<FacultyDto?>(null) }
@@ -219,20 +259,15 @@ private fun FacultyTab(vm: FacultyManageViewModel) {
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = AppSpacing.sm),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
-                ManageSectionHeader(
-                    title = "Faculty Management",
-                    description = "Manage faculty profiles, subject expertise, and weekly teaching capacity.",
-                    count = state.items.size,
-                    accentColor = MaterialTheme.colorScheme.primary,
-                )
                 AppOutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(searchFocusRequester),
                     label = { Text("Search") },
                     leadingIcon = {
                         Icon(Icons.Filled.Search, contentDescription = null)
@@ -417,9 +452,19 @@ private fun FacultyFormDialog(
 }
 
 @Composable
-private fun SubjectTab(vm: SubjectManageViewModel) {
+private fun SubjectTab(
+    vm: SubjectManageViewModel,
+    topBarSearchPulse: Int = 0,
+) {
     val state by vm.uiState.collectAsState()
     var query by remember { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(topBarSearchPulse) {
+        if (topBarSearchPulse > 0) {
+            searchFocusRequester.requestFocus()
+        }
+    }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<SubjectDto?>(null) }
     var deleteTarget by remember { mutableStateOf<SubjectDto?>(null) }
@@ -462,20 +507,15 @@ private fun SubjectTab(vm: SubjectManageViewModel) {
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = AppSpacing.sm),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
-                ManageSectionHeader(
-                    title = "Subject Catalog",
-                    description = "Define courses and lectures per week for better timetable accuracy.",
-                    count = state.items.size,
-                    accentColor = MaterialTheme.colorScheme.tertiary,
-                )
                 AppOutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(searchFocusRequester),
                     label = { Text("Search") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
@@ -629,9 +669,19 @@ private fun SubjectFormDialog(
 }
 
 @Composable
-private fun RoomTab(vm: RoomManageViewModel) {
+private fun RoomTab(
+    vm: RoomManageViewModel,
+    topBarSearchPulse: Int = 0,
+) {
     val state by vm.uiState.collectAsState()
     var query by remember { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(topBarSearchPulse) {
+        if (topBarSearchPulse > 0) {
+            searchFocusRequester.requestFocus()
+        }
+    }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<RoomDto?>(null) }
     var deleteTarget by remember { mutableStateOf<RoomDto?>(null) }
@@ -677,20 +727,15 @@ private fun RoomTab(vm: RoomManageViewModel) {
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = AppSpacing.sm),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
-                ManageSectionHeader(
-                    title = "Room Inventory",
-                    description = "Track room details and type so classes map to the right spaces.",
-                    count = state.items.size,
-                    accentColor = MaterialTheme.colorScheme.secondary,
-                )
                 AppOutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(searchFocusRequester),
                     label = { Text("Search") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
@@ -841,9 +886,19 @@ private fun RoomFormDialog(
 }
 
 @Composable
-private fun BatchTab(vm: BatchManageViewModel) {
+private fun BatchTab(
+    vm: BatchManageViewModel,
+    topBarSearchPulse: Int = 0,
+) {
     val state by vm.uiState.collectAsState()
     var query by remember { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(topBarSearchPulse) {
+        if (topBarSearchPulse > 0) {
+            searchFocusRequester.requestFocus()
+        }
+    }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<BatchDto?>(null) }
     var deleteTarget by remember { mutableStateOf<BatchDto?>(null) }
@@ -889,20 +944,15 @@ private fun BatchTab(vm: BatchManageViewModel) {
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = AppSpacing.sm),
+                    .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
-                ManageSectionHeader(
-                    title = "Batch Details",
-                    description = "Maintain batches and departments before generating the timetable.",
-                    count = state.items.size,
-                    accentColor = MaterialTheme.colorScheme.primary,
-                )
                 AppOutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(searchFocusRequester),
                     label = { Text("Search") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
@@ -1230,7 +1280,7 @@ private fun ManageSectionHeader(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 letterSpacing = (-0.4).sp

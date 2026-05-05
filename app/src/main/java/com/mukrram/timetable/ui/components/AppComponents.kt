@@ -1,14 +1,19 @@
 package com.mukrram.timetable.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
@@ -24,19 +29,34 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.Text
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.mukrram.timetable.ui.theme.AppSpacing
@@ -213,65 +233,112 @@ fun AppNavigationBar(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
-    NavigationBar(
-        modifier = modifier,
-        tonalElevation = 2.dp,
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        content = content,
-    )
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 4.dp,
+    ) {
+        NavigationBar(
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            tonalElevation = 0.dp,
+            content = content,
+        )
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RowScope.AppNavigationItem(
     selected: Boolean,
     onClick: () -> Unit,
-    icon: @Composable () -> Unit,
+    icon: ImageVector,
     label: String,
 ) {
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        label = "bottom_item_content_color",
+    val scheme = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val containerSize by animateDpAsState(
+        targetValue = if (selected) 46.dp else 38.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "nav_icon_container_size",
     )
-    val containerColor by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0f)
-        },
-        label = "bottom_item_container_color",
+    val iconSize by animateDpAsState(
+        targetValue = if (selected) 24.dp else 21.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "nav_icon_glyph_size",
     )
-    val iconContainerSize by animateDpAsState(
-        targetValue = if (selected) 38.dp else 32.dp,
-        label = "bottom_item_icon_size",
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh,
+        ),
+        label = "nav_press_scale",
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (selected) scheme.primary else scheme.onSurfaceVariant,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "nav_icon_tint",
+    )
+    val labelTint by animateColorAsState(
+        targetValue = if (selected) scheme.primary else scheme.onSurfaceVariant,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "nav_label_tint",
+    )
+    val haloColor by animateColorAsState(
+        targetValue = if (selected) scheme.primary.copy(alpha = 0.18f) else Color.Transparent,
+        animationSpec = tween(240, easing = FastOutSlowInEasing),
+        label = "nav_icon_halo",
     )
 
     Column(
         modifier = Modifier
             .weight(1f)
-            .clickable(onClick = onClick)
-            .padding(vertical = AppSpacing.sm),
+            .clickable(
+                onClick = onClick,
+                interactionSource = interactionSource,
+                indication = ripple(
+                    bounded = false,
+                    radius = 46.dp,
+                    color = scheme.primary.copy(alpha = 0.24f),
+                ),
+            )
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(iconContainerSize)
-                .background(
-                    color = containerColor,
-                    shape = CircleShape,
-                ),
+                .scale(pressScale)
+                .size(containerSize)
+                .clip(CircleShape)
+                .background(haloColor),
             contentAlignment = Alignment.Center,
         ) {
-            icon()
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(iconSize),
+                tint = iconTint,
+            )
         }
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = labelTint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

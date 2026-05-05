@@ -2,18 +2,16 @@ package com.mukrram.timetable.ui.screens.dashboard
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -27,21 +25,23 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material3.CardColors
+import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,7 +89,6 @@ fun DashboardScreen(
         uiState = uiState,
         onRefresh = { viewModel.refresh() },
         onClearError = { viewModel.clearError() },
-        onNavigateToNotifications = { navController.navigate(ExtraRoutes.Notifications) },
         onNavigateToGenerate = {
             navController.navigate(MainDestination.Generate.route) {
                 popUpTo(MainDestination.Dashboard.route) { saveState = true }
@@ -112,14 +112,7 @@ fun DashboardScreen(
         },
         onNavigateToAnalytics = { navController.navigate(ExtraRoutes.Analytics) },
         onNavigateToExport = { navController.navigate(ExtraRoutes.Export) },
-        onNavigateToProfile = {
-            navController.navigate(MainDestination.Profile.route) {
-                popUpTo(MainDestination.Dashboard.route) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
-        },
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
@@ -129,13 +122,11 @@ private fun DashboardContent(
     uiState: DashboardUiState,
     onRefresh: () -> Unit,
     onClearError: () -> Unit,
-    onNavigateToNotifications: () -> Unit,
     onNavigateToGenerate: () -> Unit,
     onNavigateToManage: () -> Unit,
     onNavigateToTimetable: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToExport: () -> Unit,
-    onNavigateToProfile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -164,8 +155,9 @@ private fun DashboardContent(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = AppSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.lg), // Tighter spacing between sections
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.lg),
             ) {
+                Spacer(modifier = Modifier.height(AppSpacing.md))
                 when {
                     uiState.loading && uiState.counts == null -> {
                         CenteredLoading(message = "Synchronizing data...")
@@ -178,34 +170,33 @@ private fun DashboardContent(
                     uiState.counts != null -> {
                         val counts = uiState.counts
 
-                        DashboardGreeting(name = "Curator")
+                        DashboardHeroCard()
 
-                        DashboardOverviewSection(
+                        DashboardSummaryRow(
                             counts = counts,
                             onOpenGenerate = onNavigateToGenerate,
                         )
 
-                        Text(
-                            text = "Resources",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
+                        DashboardSectionHeader(title = "Resource catalog")
+                        DashboardMetricGrid(counts = counts)
 
-                        MetricGrid(counts = counts)
+                        DashboardSectionHeader(title = "Catalog mix")
+                        DashboardCatalogMixCard(counts = counts)
 
-                        HeroPulseSection()
-
-                        QuickActionGrid(
+                        DashboardSectionHeader(title = "Workflow")
+                        DashboardQuickActionGrid(
                             onGenerate = onNavigateToGenerate,
                             onManage = onNavigateToManage,
                             onAnalytics = onNavigateToAnalytics,
-                            onExport = onNavigateToExport
+                            onExport = onNavigateToExport,
                         )
 
-                        ActivityFeedSection(
+//                        DashboardWorkflowTipsCard()
+
+                        DashboardSectionHeader(title = "Recent timetable")
+                        DashboardRecentActivityCard(
                             summary = uiState.lastTimetableSummary,
-                            onSeeAll = onNavigateToTimetable
+                            onOpenTimetable = onNavigateToTimetable,
                         )
 
                         if (uiState.loading) {
@@ -213,7 +204,7 @@ private fun DashboardContent(
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
                                     .padding(vertical = AppSpacing.md),
-                                strokeWidth = 3.dp
+                                strokeWidth = 3.dp,
                             )
                         }
                     }
@@ -225,100 +216,132 @@ private fun DashboardContent(
 }
 
 @Composable
-private fun DashboardGreeting(name: String) {
-    Column(modifier = Modifier.padding(top = 30.dp)) { // Removed top padding
-        Text(
-            text = "Hello $name",
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.8).sp
-            ),
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Welcome back to your workspace",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+private fun DashboardSectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        letterSpacing = 0.8.sp,
+    )
+}
+
+@Composable
+private fun DashboardHeroCard() {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        tonalElevation = 1.dp,
+        color = scheme.surfaceContainerLow,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            scheme.primaryContainer.copy(alpha = 0.55f),
+                            scheme.surfaceContainerLow,
+                        ),
+                    ),
+                )
+                .padding(AppSpacing.xl),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                Text(
+                    text = "Hello, Curator",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.4).sp,
+                    color = scheme.onSurface,
+                )
+                Text(
+                    text = "Your scheduling workspace — pull down anytime to sync counts with the server.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                    lineHeight = 22.sp,
+                )
+                Surface(
+                    shape = RoundedCornerShape(percent = 50),
+                    color = scheme.primary.copy(alpha = 0.14f),
+                ) {
+                    Text(
+                        text = "Live overview",
+                        modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scheme.primary,
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun DashboardOverviewSection(
+private fun DashboardSummaryRow(
     counts: DashboardCounts,
     onOpenGenerate: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
-    val total = counts.run { facultyCount + roomsCount + batchesCount + subjectsCount }
+    val total = counts.run {
+        facultyCount + roomsCount + batchesCount + subjectsCount
+    }
     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-        Text(
-            text = "Snapshot",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = scheme.onBackground,
-        )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            OverviewInfoCard(
+            DashboardHighlightCard(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
-                title = "Catalog scale",
+                    .heightIn(min = 148.dp),
+                title = "Entities on file",
                 headline = total.toString(),
-                supporting = "Faculty, rooms, batches & subjects combined",
-                icon = Icons.Outlined.Inventory2,
-                colors = CardDefaults.cardColors(
-                    containerColor = scheme.surfaceContainerLow,
-                    contentColor = scheme.onSurface,
-                ),
-                accent = scheme.primary,
-                headlineColor = scheme.onSurface,
-                dark = dark,
+                supporting = "${counts.facultyCount} faculty · ${counts.roomsCount} rooms · ${counts.batchesCount} batches · ${counts.subjectsCount} subjects",
+                icon = Icons.Filled.BarChart,
+                containerColor = scheme.surfaceContainerLow,
+                accentColor = scheme.primary,
+                onClick = null,
             )
-            OverviewInfoCard(
+            DashboardHighlightCard(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
+                    .heightIn(min = 148.dp),
                 title = "Next step",
-                headline = "Generate",
+                headline = if (total > 0) "Generate" else "Set up",
                 supporting = if (total > 0) {
-                    "Build a draft timetable from your dataset"
+                    "Run the engine on your current catalog"
                 } else {
-                    "Add entities under Manage first"
+                    "Add rows in Manage before generating"
                 },
                 icon = Icons.Filled.AutoAwesome,
-                colors = CardDefaults.cardColors(
-                    containerColor = scheme.tertiaryContainer,
-                    contentColor = scheme.onTertiaryContainer,
-                ),
-                accent = scheme.tertiary,
+                containerColor = scheme.tertiaryContainer,
+                accentColor = scheme.tertiary,
                 headlineColor = scheme.onTertiaryContainer,
-                dark = dark,
+                supportingColor = scheme.onTertiaryContainer.copy(alpha = 0.55f),
                 onClick = onOpenGenerate,
             )
         }
+        Spacer(Modifier.height(10.dp))
         AppCard(
             colors = CardDefaults.cardColors(
-                containerColor = scheme.primaryContainer,
+                containerColor = scheme.primaryContainer.copy(alpha = 0.25f),
                 contentColor = scheme.onPrimaryContainer,
             ),
-            border = BorderStroke(1.dp, scheme.primary.copy(alpha = if (dark) 0.28f else 0.18f)),
+            border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.2f)),
         ) {
             Row(
                 modifier = Modifier.padding(AppSpacing.lg),
+                verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Info,
                     contentDescription = null,
                     tint = scheme.primary,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(26.dp),
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
@@ -327,9 +350,10 @@ private fun DashboardOverviewSection(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "Pull down to refresh counts. After a successful run, open Analytics for utilization and Export for reports.",
+                        text = "After a successful generation, open Analytics for load and utilization, or Export for CSV and text reports.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onPrimaryContainer.copy(alpha = 0.9f),
+                        color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
+                        lineHeight = 18.sp,
                     )
                 }
             }
@@ -338,27 +362,28 @@ private fun DashboardOverviewSection(
 }
 
 @Composable
-private fun OverviewInfoCard(
+private fun DashboardHighlightCard(
     title: String,
     headline: String,
     supporting: String,
     icon: ImageVector,
-    colors: CardColors,
-    accent: Color,
-    headlineColor: Color,
-    dark: Boolean,
+    containerColor: Color,
+    accentColor: Color,
     modifier: Modifier = Modifier,
+    headlineColor: Color = MaterialTheme.colorScheme.onSurface,
+    supportingColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onClick: (() -> Unit)? = null,
 ) {
-    val scheme = MaterialTheme.colorScheme
-    val borderColor = lerp(scheme.outlineVariant, accent, if (dark) 0.45f else 0.32f).copy(
-        alpha = if (dark) 0.65f else 0.55f,
-    )
+    val outline = lerp(
+        MaterialTheme.colorScheme.outlineVariant,
+        accentColor,
+        0.35f,
+    ).copy(alpha = 0.45f)
     AppCard(
         modifier = modifier,
         onClick = onClick,
-        colors = colors,
-        border = BorderStroke(1.dp, borderColor),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        border = BorderStroke(1.dp, outline),
     ) {
         Column(
             modifier = Modifier.padding(AppSpacing.md),
@@ -366,66 +391,69 @@ private fun OverviewInfoCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .clip(MaterialTheme.shapes.medium)
-                    .background(accent.copy(alpha = if (dark) 0.22f else 0.14f)),
+                    .background(accentColor.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(20.dp),
+                    tint = accentColor,
+                    modifier = Modifier.size(22.dp),
                 )
             }
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.labelMedium,
+                color = supportingColor.copy(alpha = 0.95f),
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = headline,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.ExtraBold,
                 color = headlineColor,
+                letterSpacing = (-0.5).sp,
             )
             Text(
                 text = supporting,
                 style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant.copy(alpha = 0.88f),
+                color = supportingColor.copy(alpha = 0.9f),
+                lineHeight = 18.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
 
 @Composable
-private fun MetricGrid(counts: DashboardCounts) {
+private fun DashboardMetricGrid(counts: DashboardCounts) {
     val scheme = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
-    val base = scheme.surfaceContainerLow
+    val base = scheme.surfaceContainerLowest
     val subjectsAccent = lerp(scheme.primary, scheme.tertiary, 0.42f)
     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            ProfessionalMetricCard(
+            DashboardMetricTile(
                 label = "Faculty",
                 value = counts.facultyCount.toString(),
+                caption = "Teaching staff",
                 icon = Icons.Filled.Groups,
                 accentColor = scheme.tertiary,
                 baseContainer = base,
-                dark = dark,
                 modifier = Modifier.weight(1f),
             )
-            ProfessionalMetricCard(
+            DashboardMetricTile(
                 label = "Rooms",
                 value = counts.roomsCount.toString(),
+                caption = "Spaces",
                 icon = Icons.Filled.MeetingRoom,
                 accentColor = scheme.secondary,
                 baseContainer = base,
-                dark = dark,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -433,22 +461,22 @@ private fun MetricGrid(counts: DashboardCounts) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            ProfessionalMetricCard(
+            DashboardMetricTile(
                 label = "Batches",
                 value = counts.batchesCount.toString(),
+                caption = "Cohorts",
                 icon = Icons.Filled.School,
                 accentColor = scheme.primary,
                 baseContainer = base,
-                dark = dark,
                 modifier = Modifier.weight(1f),
             )
-            ProfessionalMetricCard(
+            DashboardMetricTile(
                 label = "Subjects",
                 value = counts.subjectsCount.toString(),
+                caption = "Courses",
                 icon = Icons.Filled.Book,
                 accentColor = subjectsAccent,
                 baseContainer = base,
-                dark = dark,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -456,112 +484,20 @@ private fun MetricGrid(counts: DashboardCounts) {
 }
 
 @Composable
-private fun HeroPulseSection() {
-    val scheme = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
-    AppCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(180.dp),
-        colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainerLow),
-        border = BorderStroke(
-            1.dp,
-            lerp(scheme.outlineVariant, scheme.primary, if (dark) 0.35f else 0.2f)
-                .copy(alpha = if (dark) 0.55f else 0.45f),
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(AppSpacing.lg),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-                Text(
-                    text = "System pulse",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = scheme.onSurface,
-                )
-                Text(
-                    text = "Relative load mix across the last generation window",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant,
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                val pulseValues = listOf(0.4f, 0.7f, 1f, 0.8f, 0.9f, 0.6f, 0.8f, 0.5f)
-                val primaryColor = scheme.primary
-                val primaryContainer = scheme.primaryContainer
-                val surfaceVariant = scheme.surfaceVariant
-                val secondaryContainer = scheme.secondaryContainer
-
-                pulseValues.forEachIndexed { index, value ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(value)
-                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = if (index == 2) {
-                                        listOf(primaryColor, primaryContainer)
-                                    } else {
-                                        listOf(secondaryContainer, surfaceVariant)
-                                    },
-                                ),
-                            ),
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "High efficiency",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = scheme.primary,
-                )
-                Icon(
-                    Icons.AutoMirrored.Filled.ShowChart,
-                    contentDescription = null,
-                    tint = scheme.primary,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProfessionalMetricCard(
+private fun DashboardMetricTile(
     label: String,
     value: String,
+    caption: String,
     icon: ImageVector,
     accentColor: Color,
     baseContainer: Color,
-    dark: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val fill = lerp(baseContainer, accentColor, if (dark) 0.28f else 0.14f)
-    val borderColor = lerp(scheme.outlineVariant, accentColor, if (dark) 0.5f else 0.38f).copy(
-        alpha = if (dark) 0.6f else 0.5f,
-    )
-    val iconBg = lerp(scheme.surfaceVariant, accentColor, if (dark) 0.42f else 0.28f)
+    val fill = lerp(baseContainer, accentColor, 0.12f)
+    val borderColor = lerp(scheme.outlineVariant, accentColor, 0.4f).copy(alpha = 0.42f)
     AppCard(
-        modifier = modifier,
+        modifier = modifier.heightIn(min = 118.dp),
         colors = CardDefaults.cardColors(
             containerColor = fill,
             contentColor = scheme.onSurface,
@@ -570,40 +506,164 @@ private fun ProfessionalMetricCard(
     ) {
         Column(
             modifier = Modifier.padding(AppSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(iconBg),
-                contentAlignment = Alignment.Center,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = accentColor,
+                Text(
+                    text = label.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.4.sp,
                 )
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(accentColor.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp),
+                        tint = accentColor,
+                    )
+                }
             }
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
                 text = value,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = scheme.onSurface,
+                letterSpacing = (-0.6).sp,
+            )
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
             )
         }
     }
 }
 
+private data class MixSegment(
+    val label: String,
+    val count: Int,
+    val color: Color,
+)
+
 @Composable
-private fun QuickActionGrid(
+private fun DashboardCatalogMixCard(counts: DashboardCounts) {
+    val scheme = MaterialTheme.colorScheme
+    val segments = listOf(
+        MixSegment("Faculty", counts.facultyCount, scheme.tertiary),
+        MixSegment("Rooms", counts.roomsCount, scheme.secondary),
+        MixSegment("Batches", counts.batchesCount, scheme.primary),
+        MixSegment("Subjects", counts.subjectsCount, lerp(scheme.primary, scheme.tertiary, 0.45f)),
+    )
+    val total = segments.sumOf { it.count }
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainerLow),
+        border = BorderStroke(
+            1.dp,
+            scheme.outlineVariant.copy(alpha = 0.4f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(AppSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.BarChart,
+                    contentDescription = null,
+                    tint = scheme.primary,
+                )
+                Column {
+                    Text(
+                        text = "Share by record count",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = scheme.onSurface,
+                    )
+                    Text(
+                        text = "How your catalog is distributed — useful before tightening constraints in Generate.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                        lineHeight = 18.sp,
+                    )
+                }
+            }
+            if (total == 0) {
+                Text(
+                    text = "No records yet. Use Manage to add faculty, rooms, batches, and subjects.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                ) {
+                    segments.forEach { seg ->
+                        val w = seg.count.toFloat().coerceAtLeast(0f)
+                        if (w > 0f) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(w)
+                                    .fillMaxSize()
+                                    .background(seg.color.copy(alpha = 0.85f)),
+                            )
+                        }
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    segments.forEach { seg ->
+                        val pct = if (total > 0) (seg.count * 100f / total) else 0f
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(seg.color),
+                                )
+                                Text(
+                                    text = seg.label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = scheme.onSurface,
+                                )
+                            }
+                            Text(
+                                text = "${seg.count} · ${"%.0f".format(pct)}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = scheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardQuickActionGrid(
     onGenerate: () -> Unit,
     onManage: () -> Unit,
     onAnalytics: () -> Unit,
@@ -611,68 +671,56 @@ private fun QuickActionGrid(
 ) {
     val scheme = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-        Text(
-            text = "Workflow Actions",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = scheme.onSurface,
-        )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            ModernActionButton(
+            DashboardActionCard(
                 title = "Generate",
-                subtitle = "Engine run",
+                subtitle = "Draft timetable",
                 icon = Icons.Filled.AutoAwesome,
                 containerColor = scheme.primaryContainer,
                 titleColor = scheme.onPrimaryContainer,
                 subtitleColor = scheme.primary,
-                iconBackground = scheme.primary.copy(alpha = 0.16f),
-                accentColor = scheme.primary,
+                iconTint = scheme.primary,
                 onClick = onGenerate,
                 modifier = Modifier.weight(1f),
             )
-            ModernActionButton(
+            DashboardActionCard(
                 title = "Manage",
-                subtitle = "Data vault",
+                subtitle = "Catalog & data",
                 icon = Icons.AutoMirrored.Outlined.ViewList,
                 containerColor = scheme.secondaryContainer,
                 titleColor = scheme.onSecondaryContainer,
                 subtitleColor = scheme.secondary,
-                iconBackground = scheme.secondary.copy(alpha = 0.16f),
-                accentColor = scheme.secondary,
+                iconTint = scheme.secondary,
                 onClick = onManage,
                 modifier = Modifier.weight(1f),
             )
         }
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            ModernActionButton(
+            DashboardActionCard(
                 title = "Analytics",
-                subtitle = "Insights",
+                subtitle = "Load & usage",
                 icon = Icons.AutoMirrored.Filled.ShowChart,
                 containerColor = scheme.tertiaryContainer,
                 titleColor = scheme.onTertiaryContainer,
                 subtitleColor = scheme.tertiary,
-                iconBackground = scheme.tertiary.copy(alpha = 0.16f),
-                accentColor = scheme.tertiary,
+                iconTint = scheme.tertiary,
                 onClick = onAnalytics,
                 modifier = Modifier.weight(1f),
             )
-            ModernActionButton(
+            DashboardActionCard(
                 title = "Export",
-                subtitle = "Reports",
+                subtitle = "CSV & reports",
                 icon = Icons.Filled.FileDownload,
                 containerColor = scheme.surfaceContainerHigh,
                 titleColor = scheme.onSurface,
                 subtitleColor = scheme.onSurfaceVariant,
-                iconBackground = scheme.onSurfaceVariant.copy(alpha = 0.14f),
-                accentColor = scheme.outline,
+                iconTint = scheme.outline,
                 onClick = onExport,
                 modifier = Modifier.weight(1f),
             )
@@ -681,53 +729,52 @@ private fun QuickActionGrid(
 }
 
 @Composable
-private fun ModernActionButton(
+private fun DashboardActionCard(
     title: String,
     subtitle: String,
     icon: ImageVector,
     containerColor: Color,
     titleColor: Color,
     subtitleColor: Color,
-    iconBackground: Color,
-    accentColor: Color,
+    iconTint: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dark = isSystemInDarkTheme()
+    val outline = lerp(
+        MaterialTheme.colorScheme.outlineVariant,
+        iconTint,
+        0.28f,
+    ).copy(alpha = 0.4f)
     AppCard(
-        modifier = modifier.height(110.dp),
+        modifier = modifier.heightIn(min = 112.dp),
         onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = containerColor,
             contentColor = titleColor,
         ),
-        border = BorderStroke(
-            1.dp,
-            lerp(MaterialTheme.colorScheme.outlineVariant, accentColor, if (dark) 0.4f else 0.28f)
-                .copy(alpha = if (dark) 0.55f else 0.42f),
-        ),
+        border = BorderStroke(1.dp, outline),
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(AppSpacing.md),
-            verticalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
-                    .background(iconBackground),
+                    .background(iconTint.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(18.dp),
+                    tint = iconTint,
+                    modifier = Modifier.size(20.dp),
                 )
             }
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
@@ -736,7 +783,7 @@ private fun ModernActionButton(
                 )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = subtitleColor,
                 )
             }
@@ -745,58 +792,159 @@ private fun ModernActionButton(
 }
 
 @Composable
-private fun ActivityFeedSection(
-    summary: LastTimetableSummary?,
-    onSeeAll: () -> Unit,
-) {
+private fun DashboardWorkflowTipsCard() {
     val scheme = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
-    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = scheme.surfaceContainerLow,
+        ),
+        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.35f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(AppSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            Text(
-                text = "Recent Activity",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = scheme.onSurface,
-            )
-            TextButton(onClick = onSeeAll) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.TipsAndUpdates,
+                    contentDescription = null,
+                    tint = scheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
                 Text(
-                    text = "View Archive",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = scheme.primary,
+                    text = "Good habits",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onSurface,
                 )
             }
+            HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+            DashboardTipLine(
+                icon = Icons.Filled.Refresh,
+                iconTint = scheme.secondary,
+                title = "Stay current",
+                body = "Pull down on this screen to refresh counts after changes in Manage or on the server.",
+            )
+            DashboardTipLine(
+                icon = Icons.AutoMirrored.Outlined.ViewList,
+                iconTint = scheme.tertiary,
+                title = "Complete the catalog",
+                body = "Accurate faculty loads, rooms, batches, and subjects produce better draft timetables.",
+            )
+            DashboardTipLine(
+                icon = Icons.Filled.AutoAwesome,
+                iconTint = scheme.primary,
+                title = "Generate, then review",
+                body = "Run Generate when ready, then inspect the Timetable tab and Analytics for conflicts or overload.",
+            )
         }
+    }
+}
 
-        AppCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainerLow),
-            border = BorderStroke(
-                1.dp,
-                scheme.outlineVariant.copy(alpha = if (dark) 0.5f else 0.42f),
-            ),
+@Composable
+private fun DashboardTipLine(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    body: String,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(iconTint.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
         ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = scheme.onSurface,
+            )
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+                lineHeight = 18.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardRecentActivityCard(
+    summary: LastTimetableSummary?,
+    onOpenTimetable: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainerLowest),
+        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.38f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(AppSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Last saved snapshot",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = scheme.onSurface,
+                    )
+                    Text(
+                        text = "Opens the Timetable tab for the full grid",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = onOpenTimetable) {
+                    Text(
+                        text = "Open",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+            HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
             summary?.let {
-                FeedItem(
+                DashboardFeedItem(
                     title = it.batch,
-                    subtitle = "Automated Timetable Generation",
-                    time = it.updatedAt ?: "Moments ago",
+                    subtitle = "Saved timetable",
+                    time = it.updatedAt?.takeIf { t -> t.isNotBlank() } ?: "Recently",
                     icon = Icons.Filled.History,
-                    iconColor = scheme.secondary,
-                    dark = dark,
+                    accent = scheme.primary,
                 )
             } ?: run {
-                FeedItem(
-                    title = "System Standby",
-                    subtitle = "No recent generations logged",
+                DashboardFeedItem(
+                    title = "No snapshot yet",
+                    subtitle = "Generate and save a timetable to see it here",
                     time = "",
                     icon = Icons.Filled.Refresh,
-                    iconColor = scheme.onSurfaceVariant,
-                    dark = dark,
+                    accent = scheme.onSurfaceVariant,
                 )
             }
         }
@@ -804,33 +952,31 @@ private fun ActivityFeedSection(
 }
 
 @Composable
-private fun FeedItem(
+private fun DashboardFeedItem(
     title: String,
     subtitle: String,
     time: String,
     icon: ImageVector,
-    iconColor: Color,
-    dark: Boolean,
+    accent: Color,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Row(
-        modifier = Modifier
-            .padding(AppSpacing.lg)
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(iconColor.copy(alpha = if (dark) 0.2f else 0.12f)),
+                .size(48.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(accent.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(22.dp),
+                tint = accent,
+                modifier = Modifier.size(24.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
@@ -838,19 +984,23 @@ private fun FeedItem(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = scheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = scheme.onSurfaceVariant,
             )
         }
-        Text(
-            text = time,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-        )
+        if (time.isNotBlank()) {
+            Text(
+                text = time,
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant.copy(alpha = 0.75f),
+            )
+        }
     }
 }
 
@@ -864,23 +1014,22 @@ fun DashboardPreview() {
                     facultyCount = 28,
                     subjectsCount = 42,
                     roomsCount = 12,
-                    batchesCount = 8
+                    batchesCount = 8,
                 ),
                 loading = false,
                 lastTimetableSummary = LastTimetableSummary(
                     batch = "Fall Semester 2024",
-                    updatedAt = "2:23 PM"
-                )
+                    updatedAt = "2:23 PM",
+                ),
             ),
             onRefresh = {},
             onClearError = {},
-            onNavigateToNotifications = {},
             onNavigateToGenerate = {},
             onNavigateToManage = {},
             onNavigateToTimetable = {},
             onNavigateToAnalytics = {},
             onNavigateToExport = {},
-            onNavigateToProfile = {},
+            modifier = Modifier,
         )
     }
 }
@@ -895,23 +1044,22 @@ fun DashboardDarkPreview() {
                     facultyCount = 28,
                     subjectsCount = 42,
                     roomsCount = 12,
-                    batchesCount = 8
+                    batchesCount = 8,
                 ),
                 loading = false,
                 lastTimetableSummary = LastTimetableSummary(
                     batch = "Fall Semester 2024",
-                    updatedAt = "2:23 PM"
-                )
+                    updatedAt = "2:23 PM",
+                ),
             ),
             onRefresh = {},
             onClearError = {},
-            onNavigateToNotifications = {},
             onNavigateToGenerate = {},
             onNavigateToManage = {},
             onNavigateToTimetable = {},
             onNavigateToAnalytics = {},
             onNavigateToExport = {},
-            onNavigateToProfile = {},
+            modifier = Modifier,
         )
     }
 }

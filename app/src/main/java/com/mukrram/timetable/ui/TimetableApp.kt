@@ -29,6 +29,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -124,6 +125,8 @@ private fun TimetableAppContent(
     val isTabRoute =
         loggedInSession != null && MainDestination.isBottomBarRoute(currentRoute, sessionState)
 
+    var manageTopBarSearchPulse by remember { mutableIntStateOf(0) }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -178,7 +181,13 @@ private fun TimetableAppContent(
                             }
                         },
                         actions = {
-                            IconButton(onClick = {}) {
+                            IconButton(
+                                onClick = {
+                                    if (currentRoute == MainDestination.Manage.route) {
+                                        manageTopBarSearchPulse++
+                                    }
+                                },
+                            ) {
                                 Icon(
                                     Icons.Filled.Search,
                                     contentDescription = "Search",
@@ -240,18 +249,7 @@ private fun TimetableAppContent(
                                     restoreState = true
                                 }
                             },
-                            icon = {
-                                Icon(
-                                    destination.icon,
-                                    contentDescription = destination.label,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (selected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                )
-                            },
+                            icon = destination.icon,
                             label = destination.label,
                         )
                     }
@@ -307,7 +305,10 @@ private fun TimetableAppContent(
                                         DashboardScreen(navController = navController)
                                     }
                                     composable(MainDestination.Manage.route) {
-                                        ManageScreen(navController = navController)
+                                        ManageScreen(
+                                            navController = navController,
+                                            topBarSearchPulse = manageTopBarSearchPulse,
+                                        )
                                     }
                                     composable(MainDestination.Generate.route) {
                                         GenerateScreen(navController = navController)

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
+import com.mukrram.timetable.data.model.AppThemeMode
 import com.mukrram.timetable.data.remote.JwtPayloadParser
 import com.mukrram.timetable.data.remote.dto.SavedTimetableResponse
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +41,14 @@ class TimetablePreferences(
     /** When false or unset, the app shows the first-run onboarding flow. */
     val hasCompletedOnboarding: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[KEY_HAS_COMPLETED_ONBOARDING] == true
+    }
+
+    val themePreference: Flow<AppThemeMode> = dataStore.data.map { prefs ->
+        AppThemeMode.fromStorage(prefs[KEY_THEME_MODE])
+    }
+
+    suspend fun setThemeMode(mode: AppThemeMode) {
+        dataStore.edit { it[KEY_THEME_MODE] = mode.storageValue }
     }
 
     suspend fun setAuthToken(token: String?) {
@@ -80,5 +89,6 @@ class TimetablePreferences(
         private val KEY_AUTH_TOKEN = stringPreferencesKey("auth_token")
         private val KEY_LAST_TIMETABLE_JSON = stringPreferencesKey("last_timetable_json")
         private val KEY_HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
+        private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     }
 }

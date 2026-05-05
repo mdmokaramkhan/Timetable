@@ -1,7 +1,7 @@
 package com.mukrram.timetable.data.remote
 
 /**
- * Canonical Mon–Fri × S1–S8 grid. Must stay in sync with
+ * Canonical Mon–Fri × hourly slot grid. Must stay in sync with
  * `server/src/constants/timetable.js` (TIMETABLE_DAYS, TIMETABLE_SLOTS).
  */
 object TimetableGridDefaults {
@@ -14,6 +14,6 @@ object TimetableGridDefaults {
     )
 
     val SLOTS: List<String> = listOf(
-        "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8",
+        "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00",
     )
 }

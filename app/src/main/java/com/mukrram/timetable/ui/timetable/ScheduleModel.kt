@@ -3,7 +3,7 @@ package com.mukrram.timetable.ui.timetable
 import com.mukrram.timetable.data.remote.TimetableGridDefaults
 import com.mukrram.timetable.data.remote.dto.ScheduleCellDto
 
-/** Default Mon–Fri × S1–S8 grid (same source as [TimetableGridDefaults]). */
+/** Default Mon–Fri × hourly slot grid (same source as [TimetableGridDefaults]). */
 val DefaultTimetableDays: List<String> = TimetableGridDefaults.DAYS
 
 val DefaultTimetableSlots: List<String> = TimetableGridDefaults.SLOTS
