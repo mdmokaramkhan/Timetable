@@ -179,42 +179,42 @@ fun TimetableScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TimetableTopAppBar(
-                titleText = "Timetable",
-                actions = {
-                    if (!uiState.isFacultyViewer) {
-                        IconButton(onClick = onNavigateToSubstitution) {
-                            Icon(Icons.Filled.SwapHoriz, contentDescription = "Substitution")
-                        }
-                    }
-                    if (!uiState.isFacultyViewer && uiState.draftSchedule != null) {
-                        IconButton(
-                            onClick = { viewModel.discardDraft() },
-                            enabled = !uiState.saving,
-                        ) {
-                            Icon(Icons.Filled.Undo, contentDescription = "Discard edits")
-                        }
-                        IconButton(
-                            onClick = { viewModel.saveDraft() },
-                            enabled = !uiState.saving && uiState.selectedBatchName != null,
-                        ) {
-                            Icon(Icons.Filled.Save, contentDescription = "Save timetable")
-                        }
-                    }
-                    IconButton(
-                        onClick = { viewModel.refreshTimetable() },
-                        enabled = when {
-                            uiState.loadingTimetable -> false
-                            uiState.isFacultyViewer -> true
-                            else -> uiState.selectedBatchName != null
-                        },
-                    ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh timetable")
-                    }
-                },
-            )
-        },
+//        topBar = {
+//            TimetableTopAppBar(
+//                titleText = "Timetable",
+//                actions = {
+//                    if (!uiState.isFacultyViewer) {
+//                        IconButton(onClick = onNavigateToSubstitution) {
+//                            Icon(Icons.Filled.SwapHoriz, contentDescription = "Substitution")
+//                        }
+//                    }
+//                    if (!uiState.isFacultyViewer && uiState.draftSchedule != null) {
+//                        IconButton(
+//                            onClick = { viewModel.discardDraft() },
+//                            enabled = !uiState.saving,
+//                        ) {
+//                            Icon(Icons.Filled.Undo, contentDescription = "Discard edits")
+//                        }
+//                        IconButton(
+//                            onClick = { viewModel.saveDraft() },
+//                            enabled = !uiState.saving && uiState.selectedBatchName != null,
+//                        ) {
+//                            Icon(Icons.Filled.Save, contentDescription = "Save timetable")
+//                        }
+//                    }
+//                    IconButton(
+//                        onClick = { viewModel.refreshTimetable() },
+//                        enabled = when {
+//                            uiState.loadingTimetable -> false
+//                            uiState.isFacultyViewer -> true
+//                            else -> uiState.selectedBatchName != null
+//                        },
+//                    ) {
+//                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh timetable")
+//                    }
+//                },
+//            )
+//        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         val batchNames = if (uiState.isFacultyViewer) {
