@@ -11,8 +11,13 @@ data class ScheduleCellDto(
 
 data class GenerateTimetableRequest(
     val batch: String,
+    /** Server clamps to 2…3 distinct options. */
     val optionsCount: Int? = null,
+    /** Omit or null for no per-day cap (matches generator). */
     val maxClassesPerDay: Int? = null,
+    /** When set, must match server timetable constants. */
+    val days: List<String>? = null,
+    val slots: List<String>? = null,
 )
 
 data class GenerateStatsDto(
@@ -42,6 +47,8 @@ data class SaveTimetableRequest(
 
 data class SaveTimetableResponse(
     val ok: Boolean = false,
+    /** Present on 200 responses from POST /timetable/save. */
+    val timetable: SavedTimetableResponse? = null,
 )
 
 data class SavedTimetableResponse(

@@ -11,18 +11,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -35,17 +36,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.mukrram.timetable.ui.theme.AppSpacing
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.navigation.compose.rememberNavController
 import com.mukrram.timetable.R
 import com.mukrram.timetable.data.connectivity.rememberIsOnline
@@ -55,6 +57,8 @@ import com.mukrram.timetable.data.remote.SessionState
 import com.mukrram.timetable.navigation.AuthRoutes
 import com.mukrram.timetable.navigation.ExtraRoutes
 import com.mukrram.timetable.navigation.MainDestination
+import com.mukrram.timetable.navigation.isOverlayDestination
+import com.mukrram.timetable.navigation.overlayScreenTitle
 import com.mukrram.timetable.ui.components.AppNavigationBar
 import com.mukrram.timetable.ui.components.AppNavigationItem
 import com.mukrram.timetable.ui.components.TimetableTopAppBar
@@ -73,6 +77,7 @@ import com.mukrram.timetable.ui.screens.timetable.TimetableScreen
 import com.mukrram.timetable.ui.viewmodel.AppViewModelFactory
 import kotlinx.coroutines.flow.first
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimetableApp(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
@@ -86,6 +91,7 @@ fun TimetableApp(modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimetableAppContent(
     navController: NavHostController,
@@ -106,55 +112,119 @@ private fun TimetableAppContent(
     }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val currentRoute = currentDestination?.route
     val bottomDestinations = MainDestination.bottomBarDestinations(sessionState)
     val isOnline = rememberIsOnline()
+    val topAppBarScrollState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(topAppBarScrollState)
+
+    val showAuthFlow = sessionState == SessionState.LoggedOut && bootstrapReady
+    val loggedInSession = sessionState as? SessionState.LoggedIn
+    val showMainChrome = loggedInSession != null && bootstrapReady
+    val isTabRoute =
+        loggedInSession != null && MainDestination.isBottomBarRoute(currentRoute, sessionState)
 
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .then(
+                if (showMainChrome) {
+                    Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                } else {
+                    Modifier
+                },
+            ),
         topBar = {
-            TimetableTopAppBar(
-                titleText = "",
-                elevation = 2.dp, // Subtle elevation
-                navigationIcon = {
-                    IconButton(onClick = {
-                        navController.navigate(MainDestination.Profile.route) {
-                            popUpTo(MainDestination.Dashboard.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .shadow(0.5.dp, CircleShape)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onPrimary)
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.profile),
-                                contentDescription = "Profile",
-                                modifier = Modifier.size(48.dp),
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = { navController.navigate(ExtraRoutes.Substitution) }) {
-                        Icon(Icons.Filled.SwapHoriz, contentDescription = "Substitution")
-                    }
-                    IconButton(onClick = { navController.navigate(ExtraRoutes.Notifications) },) {
-                        Icon(Icons.Filled.Notifications, contentDescription = "Notifications", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-            )
+            when {
+                !bootstrapReady -> { }
+                showAuthFlow -> { }
+                loggedInSession == null -> { }
+                isTabRoute -> {
+                    val isAdmin = loggedInSession.role == UserRole.Admin
+                    TimetableTopAppBar(
+                        titleText = "",
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                navController.navigate(MainDestination.Profile.route) {
+                                    when (loggedInSession.role) {
+                                        UserRole.Admin ->
+                                            popUpTo(MainDestination.Dashboard.route) { saveState = true }
+                                        UserRole.Faculty ->
+                                            popUpTo(MainDestination.Timetable.route) { saveState = true }
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .shadow(0.5.dp, CircleShape)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.onPrimary)
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                                            CircleShape,
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.profile),
+                                        contentDescription = "Profile",
+                                        modifier = Modifier.size(48.dp),
+                                    )
+                                }
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = {}) {
+                                Icon(
+                                    Icons.Filled.Search,
+                                    contentDescription = "Search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (isAdmin) {
+                                IconButton(onClick = { navController.navigate(ExtraRoutes.Substitution) }) {
+                                    Icon(Icons.Filled.SwapHoriz, contentDescription = "Substitution")
+                                }
+                                IconButton(onClick = { navController.navigate(ExtraRoutes.Notifications) }) {
+                                    Icon(
+                                        Icons.Filled.Notifications,
+                                        contentDescription = "Notifications",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        },
+                        scrollBehavior = scrollBehavior,
+                    )
+                }
+                isOverlayDestination(currentRoute) -> {
+                    TimetableTopAppBar(
+                        titleText = overlayScreenTitle(currentRoute).orEmpty(),
+                        navigationIcon = {
+                            IconButton(onClick = { navController.navigateUp() }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        actions = { },
+                        scrollBehavior = scrollBehavior,
+                    )
+                }
+                else -> { }
+            }
         },
         bottomBar = {
-            if (bottomDestinations.isNotEmpty()) {
+            if (loggedInSession != null &&
+                bottomDestinations.isNotEmpty() &&
+                MainDestination.isBottomBarRoute(currentRoute, sessionState)
+            ) {
                 AppNavigationBar {
                     bottomDestinations.forEach { destination ->
                         val selected =
@@ -252,16 +322,16 @@ private fun TimetableAppContent(
                                 }
                                 if (loggedIn.role == UserRole.Admin) {
                                     composable(MainDestination.Substitution.route) {
-                                        SubstitutionScreen(navController = navController)
+                                        SubstitutionScreen()
                                     }
                                     composable(ExtraRoutes.Analytics) {
-                                        AnalyticsScreen(navController = navController)
+                                        AnalyticsScreen()
                                     }
                                     composable(ExtraRoutes.Export) {
-                                        ExportScreen(navController = navController)
+                                        ExportScreen()
                                     }
                                     composable(ExtraRoutes.Notifications) {
-                                        NotificationsScreen(navController = navController)
+                                        NotificationsScreen()
                                     }
                                 }
                                 composable(MainDestination.Profile.route) {

@@ -1,8 +1,7 @@
 package com.mukrram.timetable.ui.screens.generate
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,14 +15,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Dataset
-import androidx.compose.material.icons.outlined.LockClock
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.TipsAndUpdates
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,8 +30,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -40,8 +42,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,11 +53,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.mukrram.timetable.data.remote.dto.GenerateTimetableResponse
+import com.mukrram.timetable.data.remote.dto.ScheduleCellDto
 import com.mukrram.timetable.data.remote.dto.TimetableOptionDto
 import com.mukrram.timetable.data.repository.DashboardCounts
 import com.mukrram.timetable.navigation.MainDestination
@@ -67,8 +71,9 @@ import com.mukrram.timetable.ui.components.AppPullToRefreshBox
 import com.mukrram.timetable.ui.components.CenteredLoading
 import com.mukrram.timetable.ui.components.EmptyState
 import com.mukrram.timetable.ui.components.ErrorState
-import com.mukrram.timetable.ui.components.TimetableTopAppBar
 import com.mukrram.timetable.ui.theme.AppSpacing
+import com.mukrram.timetable.ui.timetable.DefaultTimetableDays
+import com.mukrram.timetable.ui.timetable.DefaultTimetableSlots
 import com.mukrram.timetable.ui.viewmodel.GenerateViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,7 +86,6 @@ fun GenerateScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var batchMenuExpanded by remember { mutableStateOf(false) }
-    var fixedSlotsEnabled by remember { mutableStateOf(true) }
 
     LaunchedEffect(uiState.error) {
         val err = uiState.error ?: return@LaunchedEffect
@@ -107,6 +111,7 @@ fun GenerateScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -121,12 +126,12 @@ fun GenerateScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(AppSpacing.lg),
+                    .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
             ) {
                 when {
                     uiState.loadingSummary && uiState.counts == null -> {
-                        CenteredLoading(message = "Loading data summary…")
+                        CenteredLoading(message = "Loading workspace…")
                     }
 
                     uiState.error != null && uiState.counts == null && !uiState.loadingSummary -> {
@@ -137,27 +142,33 @@ fun GenerateScreen(
                     }
 
                     else -> {
-                        val c = uiState.counts
-                        if (c != null) {
-                            HeroHeader()
-                            SummaryAndAuditSection(
-                                counts = c,
-                                onUpdate = { viewModel.refreshSummary() },
+                        val gridDayCount = uiState.generateResult?.days?.size ?: DefaultTimetableDays.size
+                        val gridSlotCount = uiState.generateResult?.slots?.size ?: DefaultTimetableSlots.size
+
+                        GenerateHeroSection(
+                            onRefresh = { viewModel.refreshSummary() },
+                            isRefreshing = uiState.loadingSummary,
+                        )
+
+                        uiState.counts?.let { counts ->
+                            WorkspaceStatsGrid(
+                                counts = counts,
+                                onRefresh = { viewModel.refreshSummary() },
                                 isRefreshing = uiState.loadingSummary,
                             )
+                            ReadinessHintCard(counts = counts)
                         }
-                        if (uiState.loadingSummary) {
-                            CenteredLoading(
-                                message = "Refreshing summary…",
+
+                        if (uiState.loadingSummary && uiState.counts != null) {
+                            LinearProgressIndicator(
                                 modifier = Modifier
-                                    .align(Alignment.CenterHorizontally)
-                                    .padding(top = AppSpacing.xs),
+                                    .fillMaxWidth()
+                                    .height(3.dp),
                             )
                         }
 
-                        ConstraintsCard(
+                        SchedulingSetupCard(
                             selectedBatchName = uiState.selectedBatchName,
-                            maxClassesPerDayText = uiState.maxClassesPerDayText,
                             batches = uiState.batches.map { it.name },
                             batchMenuExpanded = batchMenuExpanded,
                             onBatchMenuToggle = { batchMenuExpanded = !batchMenuExpanded },
@@ -166,43 +177,57 @@ fun GenerateScreen(
                                 viewModel.onBatchSelected(it)
                                 batchMenuExpanded = false
                             },
+                            maxClassesPerDayText = uiState.maxClassesPerDayText,
                             onMaxClassesChange = viewModel::onMaxClassesPerDayChange,
-                            loadingGenerate = uiState.loadingGenerate,
-                            canGenerate = uiState.selectedBatchName != null,
-                            onGenerate = viewModel::generate,
-                            fixedSlotsEnabled = fixedSlotsEnabled,
-                            onFixedSlotsChange = { fixedSlotsEnabled = it },
+                            optionsCount = uiState.optionsCount,
+                            onOptionsCountChange = viewModel::onOptionsCountChange,
+                            gridDayCount = gridDayCount,
+                            gridSlotCount = gridSlotCount,
                         )
 
-                        PrimaryGenerateSection(
-                            loadingGenerate = uiState.loadingGenerate,
-                            canGenerate = uiState.selectedBatchName != null,
+                        GenerateCallToActionSection(
+                            loading = uiState.loadingGenerate,
+                            enabled = uiState.selectedBatchName != null,
+                            optionCount = uiState.optionsCount,
                             onGenerate = viewModel::generate,
                         )
 
-                        val result = uiState.generateResult
-                        if (result != null) {
-                            SectionHeader(
-                                title = "Pick an option (${result.options.size})",
-                                subtitle = "Choose one result and save it",
-                                icon = Icons.Outlined.AutoAwesome,
+                        uiState.generateResult?.let { result ->
+                            Text(
+                                text = "Preview",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            BestOptionPreviewCard(result = result)
+
+                            Text(
+                                text = "Choose a draft (${result.options.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                             if (result.options.isEmpty()) {
                                 EmptyState(
-                                    title = "No options generated",
-                                    message = "Try another batch or loosen constraints, then generate again.",
+                                    title = "No schedules returned",
+                                    message = "Relax the daily cap or fix data in Manage.",
                                 )
                             } else {
-                                result.options.forEach { opt ->
-                                    TimetableOptionCard(
-                                        option = opt,
-                                        saving = uiState.savingOptionId == opt.id,
-                                        onSelect = { viewModel.selectAndSaveOption(opt) },
-                                    )
+                                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                                    result.options.forEach { opt ->
+                                        RichOptionCard(
+                                            option = opt,
+                                            saving = uiState.savingOptionId == opt.id,
+                                            onSave = { viewModel.selectAndSaveOption(opt) },
+                                        )
+                                    }
                                 }
                             }
                         }
-                        PreviewInsightsSection(options = uiState.generateResult?.options.orEmpty())
+
+                        WorkflowTipsCard()
+
+                        Spacer(modifier = Modifier.height(AppSpacing.xxl))
                     }
                 }
             }
@@ -211,146 +236,149 @@ fun GenerateScreen(
 }
 
 @Composable
-private fun HeroHeader() {
-    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-        Text(
-            text = "Generate Timetable",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = "Choose a batch and constraints, then generate and save the best option.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun SummaryAndAuditSection(
-    counts: DashboardCounts,
-    onUpdate: () -> Unit,
+private fun GenerateHeroSection(
+    onRefresh: () -> Unit,
     isRefreshing: Boolean,
 ) {
-    val total = counts.subjectsCount + counts.facultyCount + counts.roomsCount + counts.batchesCount
-    val balancedRooms = counts.roomsCount >= counts.subjectsCount
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
     ) {
-        AppCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
-            Column(modifier = Modifier.padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Build timetables",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onBackground,
+                )
+                Spacer(Modifier.width(5.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = scheme.primaryContainer.copy(alpha = 0.55f),
                 ) {
-                    Column {
-                        Text(
-                            text = "Live Database",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = "Summary",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    Surface(
-                        onClick = onUpdate,
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = AppSpacing.sm, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isRefreshing) "Updating" else "Update",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                ) {
-                    SummaryStat("Subjects", counts.subjectsCount, Modifier.weight(1f))
-                    SummaryStat("Faculty", counts.facultyCount, Modifier.weight(1f))
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-                ) {
-                    SummaryStat("Rooms", counts.roomsCount, Modifier.weight(1f))
-                    SummaryStat("Batches", counts.batchesCount, Modifier.weight(1f))
+                    Text(
+                        text = "Scheduler",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scheme.onPrimaryContainer,
+                    )
                 }
             }
+            Text(
+                text = "Refresh, pick a batch, then generate and save a draft.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant,
+            )
         }
-        AppCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        ) {
-            Column(
-                modifier = Modifier.padding(AppSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Schedule,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+        IconButton(onClick = onRefresh, enabled = !isRefreshing) {
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .height(24.dp)
+                        .width(24.dp),
+                    strokeWidth = 2.dp,
                 )
-                Text(
-                    text = "Smart audit",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "$total records ready",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Text(
-                    text = if (balancedRooms) "Room capacity looks healthy." else "Rooms are fewer than subjects.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+            } else {
+                Icon(Icons.Filled.Refresh, contentDescription = "Refresh workspace")
             }
         }
     }
 }
 
 @Composable
-private fun SummaryStat(
-    label: String,
-    count: Int,
-    modifier: Modifier = Modifier,
+private fun WorkspaceStatsGrid(
+    counts: DashboardCounts,
+    onRefresh: () -> Unit,
+    isRefreshing: Boolean,
 ) {
     AppCard(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(
             modifier = Modifier.padding(AppSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        text = "Catalog",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Surface(
+                    onClick = onRefresh,
+                    enabled = !isRefreshing,
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = AppSpacing.md, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.height(18.dp).width(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.height(18.dp))
+                        }
+                        Text("Sync", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            ) {
+                StatTile("Subjects", counts.subjectsCount, Modifier.weight(1f))
+                StatTile("Faculty", counts.facultyCount, Modifier.weight(1f))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            ) {
+                StatTile("Rooms", counts.roomsCount, Modifier.weight(1f))
+                StatTile("Batches", counts.batchesCount, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatTile(
+    label: String,
+    value: Int,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+    ) {
+        Column(
+            modifier = Modifier.padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.headlineMedium,
+                text = value.toString(),
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -364,149 +392,181 @@ private fun SummaryStat(
 }
 
 @Composable
-private fun SectionHeader(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Column {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun ConstraintsCard(
-    selectedBatchName: String?,
-    maxClassesPerDayText: String,
-    batches: List<String>,
-    batchMenuExpanded: Boolean,
-    onBatchMenuToggle: () -> Unit,
-    onBatchMenuDismiss: () -> Unit,
-    onSelectBatch: (String) -> Unit,
-    onMaxClassesChange: (String) -> Unit,
-    loadingGenerate: Boolean,
-    canGenerate: Boolean,
-    onGenerate: () -> Unit,
-    fixedSlotsEnabled: Boolean,
-    onFixedSlotsChange: (Boolean) -> Unit,
-) {
-    val sliderValue = maxClassesPerDayText.toFloatOrNull()?.coerceIn(1f, 10f) ?: 6f
-    val slotText = maxClassesPerDayText.ifBlank { sliderValue.toInt().toString() }
+private fun ReadinessHintCard(counts: DashboardCounts) {
+    val healthy = counts.roomsCount >= counts.subjectsCount && counts.facultyCount > 0
+    val scheme = MaterialTheme.colorScheme
     AppCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(
+            containerColor = if (healthy) {
+                scheme.primaryContainer.copy(alpha = 0.35f)
+            } else {
+                scheme.tertiaryContainer.copy(alpha = 0.45f)
+            },
+        ),
     ) {
-        Column(
-            modifier = Modifier.padding(AppSpacing.lg),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        Row(
+            modifier = Modifier.padding(AppSpacing.md),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            SectionHeader(
-                title = "Optimization constraints",
-                subtitle = "Select batch and optional class load limit",
-                icon = Icons.Outlined.Tune,
+            Icon(
+                imageVector = if (healthy) Icons.Outlined.Schedule else Icons.Outlined.Info,
+                contentDescription = null,
+                tint = if (healthy) scheme.primary else scheme.tertiary,
             )
-
-            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                AcademicTermDropdown(
-                    selectedBatchName = selectedBatchName,
-                    batches = batches,
-                    batchMenuExpanded = batchMenuExpanded,
-                    onBatchMenuToggle = onBatchMenuToggle,
-                    onBatchMenuDismiss = onBatchMenuDismiss,
-                    onSelectBatch = onSelectBatch,
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = if (healthy) "Looks ready" else "Check your data",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = scheme.onSurface,
                 )
-                MaxClassesSlider(
-                    sliderValue = sliderValue,
-                    onMaxClassesChange = onMaxClassesChange,
-                )
-                SlotStrategyRow(
-                    fixedSlotsEnabled = fixedSlotsEnabled,
-                    onFixedSlotsChange = onFixedSlotsChange,
+                Text(
+                    text = when {
+                        counts.facultyCount == 0 -> "Add faculty in Manage first."
+                        !healthy -> "Fewer rooms than subjects — add rooms or expect failures."
+                        else -> "Enough rooms and faculty for a typical run."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            ) {
-                ConstraintPill(
-                    label = "Batch",
-                    value = selectedBatchName ?: "Not selected",
-                    modifier = Modifier.weight(1f),
-                )
-                ConstraintPill(
-                    label = "Max/day",
-                    value = slotText,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
         }
     }
 }
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun AcademicTermDropdown(
+private fun SchedulingSetupCard(
     selectedBatchName: String?,
     batches: List<String>,
     batchMenuExpanded: Boolean,
     onBatchMenuToggle: () -> Unit,
     onBatchMenuDismiss: () -> Unit,
     onSelectBatch: (String) -> Unit,
-    modifier: Modifier = Modifier,
+    maxClassesPerDayText: String,
+    onMaxClassesChange: (String) -> Unit,
+    optionsCount: Int,
+    onOptionsCountChange: (Int) -> Unit,
+    gridDayCount: Int,
+    gridSlotCount: Int,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Academic term", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        ExposedDropdownMenuBox(
-            expanded = batchMenuExpanded,
-            onExpandedChange = { onBatchMenuToggle() },
+    val sliderValue = maxClassesPerDayText.toFloatOrNull()?.coerceIn(1f, 10f) ?: 6f
+    val scheme = MaterialTheme.colorScheme
+
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = scheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.35f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
         ) {
-            AppOutlinedTextField(
-                value = selectedBatchName.orEmpty(),
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Batch") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = batchMenuExpanded) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(),
-                placeholder = { Text("Choose a batch") },
-            )
-            ExposedDropdownMenu(
-                expanded = batchMenuExpanded,
-                onDismissRequest = onBatchMenuDismiss,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
             ) {
-                if (batches.isEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text("No batches — add one in Manage") },
-                        onClick = onBatchMenuDismiss,
+                Icon(Icons.Outlined.Tune, contentDescription = null, tint = scheme.primary)
+                Column {
+                    Text(
+                        text = "Constraints",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                } else {
-                    batches.forEach { name ->
-                        DropdownMenuItem(
-                            text = { Text(name) },
-                            onClick = { onSelectBatch(name) },
-                        )
+                    Text(
+                        text = "Batch, daily cap, variants · ${gridDayCount}×$gridSlotCount grid",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            ExposedDropdownMenuBox(
+                expanded = batchMenuExpanded,
+                onExpandedChange = { onBatchMenuToggle() },
+            ) {
+                AppOutlinedTextField(
+                    value = selectedBatchName.orEmpty(),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Batch") },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.School, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = batchMenuExpanded)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    placeholder = { Text("Select batch") },
+                )
+                ExposedDropdownMenu(
+                    expanded = batchMenuExpanded,
+                    onDismissRequest = onBatchMenuDismiss,
+                ) {
+                    if (batches.isEmpty()) {
+                        DropdownMenuItem(text = { Text("None — add in Manage") }, onClick = onBatchMenuDismiss)
+                    } else {
+                        batches.forEach { name ->
+                            DropdownMenuItem(text = { Text(name) }, onClick = { onSelectBatch(name) })
+                        }
                     }
+                }
+            }
+
+            HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+
+            Text(
+                text = "Max / day",
+                style = MaterialTheme.typography.labelLarge,
+                color = scheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
+            ) {
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { onMaxClassesChange(it.toInt().toString()) },
+                    valueRange = 1f..10f,
+                    steps = 8,
+                    modifier = Modifier.weight(1f),
+                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = scheme.primary.copy(alpha = 0.14f),
+                ) {
+                    Text(
+                        text = sliderValue.toInt().toString(),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = scheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Variants", style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+                    FilterChip(
+                        selected = optionsCount == 2,
+                        onClick = { onOptionsCountChange(2) },
+                        label = { Text("2") },
+                    )
+                    FilterChip(
+                        selected = optionsCount == 3,
+                        onClick = { onOptionsCountChange(3) },
+                        label = { Text("3") },
+                    )
                 }
             }
         }
@@ -514,245 +574,121 @@ private fun AcademicTermDropdown(
 }
 
 @Composable
-private fun MaxClassesSlider(
-    sliderValue: Float,
-    onMaxClassesChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Max classes/day", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-            ) {
-                Text(
-                    text = sliderValue.toInt().toString().padStart(2, '0'),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        Slider(
-            value = sliderValue,
-            onValueChange = { onMaxClassesChange(it.toInt().toString()) },
-            valueRange = 1f..10f,
-            steps = 8,
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("01", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("05", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("10", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun SlotStrategyRow(
-    fixedSlotsEnabled: Boolean,
-    onFixedSlotsChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.LockClock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Slot strategy", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        AppCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(AppSpacing.sm),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = if (fixedSlotsEnabled) "Fixed Time Slots" else "Flexible Slots",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Switch(
-                    checked = fixedSlotsEnabled,
-                    onCheckedChange = onFixedSlotsChange,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PrimaryGenerateSection(
-    loadingGenerate: Boolean,
-    canGenerate: Boolean,
+private fun GenerateCallToActionSection(
+    loading: Boolean,
+    enabled: Boolean,
+    optionCount: Int,
     onGenerate: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-    ) {
-        AppButton(
-            onClick = onGenerate,
-            enabled = !loadingGenerate && canGenerate,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (loadingGenerate) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .height(22.dp)
-                        .padding(end = AppSpacing.sm),
-                    strokeWidth = 2.dp,
-                )
-            }
-            Icon(Icons.Outlined.AutoAwesome, contentDescription = null)
-            Spacer(modifier = Modifier.width(AppSpacing.sm))
-            Text("Generate timetable")
-        }
-        Text(
-            text = "Estimated processing time: 4-6 seconds",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun ConstraintPill(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
     AppCard(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)),
     ) {
-        Column(modifier = Modifier.padding(AppSpacing.sm)) {
+        Column(
+            Modifier.padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        ) {
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
+                text = "Clash‑free drafts in seconds. Saving sends you to Timetable.",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
+            AppButton(
+                onClick = onGenerate,
+                enabled = enabled && !loading,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(20.dp).width(20.dp).padding(end = AppSpacing.sm),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null)
+                Spacer(Modifier.width(AppSpacing.sm))
+                Text("Generate ($optionCount)")
+            }
         }
     }
 }
 
 @Composable
-private fun PreviewInsightsSection(options: List<TimetableOptionDto>) {
-    val firstOption = options.firstOrNull()
-    val firstDay = firstOption?.schedule?.entries?.firstOrNull()
-    val previewItems = firstDay?.value?.take(2).orEmpty()
-    Column(
+private fun BestOptionPreviewCard(result: GenerateTimetableResponse) {
+    val option = result.options.maxByOrNull { it.stats.placed } ?: result.options.firstOrNull()
+    if (option == null) return
+    val dayKey = option.schedule.keys.firstOrNull() ?: return
+    val cells: List<ScheduleCellDto> = option.schedule[dayKey]?.take(4).orEmpty()
+
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        AppCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        Column(
+            Modifier.padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
-            Column(
-                modifier = Modifier.padding(AppSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            ) {
-                Text(
-                    text = "Curator preview",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = firstDay?.key?.let { "Sample from $it" } ?: "Generate to see sample slots",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (previewItems.isEmpty()) {
-                    Text(
-                        text = "No slot preview available yet.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    previewItems.forEach { cell ->
-                        AppCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                        ) {
-                            Column(Modifier.padding(AppSpacing.sm)) {
-                                Text(cell.slot, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                                Text(cell.subject, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                Text("${cell.room} • ${cell.faculty}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+            Text(
+                text = "${option.id.uppercase()} · ${dayKey.take(3)} snapshot",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (cells.isEmpty()) {
+                Text("No preview rows.", style = MaterialTheme.typography.bodySmall)
+            } else {
+                cells.forEach { cell ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    ) {
+                        Column(Modifier.padding(AppSpacing.sm)) {
+                            Text(cell.subject, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                            Text(
+                                "${cell.faculty} · ${cell.room}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }
             }
         }
-        AppCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        ) {
-            Column(
-                modifier = Modifier.padding(AppSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            ) {
-                Text(
-                    text = "Workspace insight",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                val best = options.maxByOrNull { it.stats.placed }
-                Text(
-                    text = best?.let { "Best current option: ${it.id.uppercase()}" } ?: "No option yet",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = best?.let { "Places ${it.stats.placed}/${it.stats.required} lectures with current constraints." }
-                        ?: "Generate options to inspect optimization insights.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
     }
 }
 
 @Composable
-private fun TimetableOptionCard(
+private fun RichOptionCard(
     option: TimetableOptionDto,
     saving: Boolean,
-    onSelect: () -> Unit,
+    onSave: () -> Unit,
 ) {
     val stats = option.stats
-    val load = stats.facultyLoad
-    val loadSummary = load?.entries?.joinToString(", ") { "${it.key}: ${it.value}" }
-        ?: "—"
+    val loadLine =
+        stats.facultyLoad?.entries.orEmpty().joinToString(", ") { "${it.key}: ${it.value}" }
+            .ifBlank { "—" }
+    val pct = remember(stats.placed, stats.required) {
+        val r = stats.required.coerceAtLeast(1).toFloat()
+        (stats.placed / r).coerceIn(0f, 1f)
+    }
 
     AppCard(
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        Column(
+            Modifier.padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = option.id.uppercase(),
+                    option.id.uppercase(),
                     style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Surface(
@@ -760,53 +696,71 @@ private fun TimetableOptionCard(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 ) {
                     Text(
-                        text = option.batch,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        option.batch,
+                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-            ) {
-                ConstraintPill(
-                    label = "Placed",
-                    value = stats.placed.toString(),
-                    modifier = Modifier.weight(1f),
-                )
-                ConstraintPill(
-                    label = "Required",
-                    value = stats.required.toString(),
-                    modifier = Modifier.weight(1f),
-                )
-            }
             Text(
-                text = "Faculty load",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = loadSummary,
+                "Coverage ${stats.placed} / ${stats.required}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            LinearProgressIndicator(
+                progress = { pct },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            )
+            Text("Load", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                loadLine,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+            )
             AppButton(
-                onClick = onSelect,
+                onClick = onSave,
                 enabled = !saving,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (saving) {
                     CircularProgressIndicator(
-                        modifier = Modifier
-                            .height(22.dp)
-                            .padding(end = 8.dp),
+                        modifier = Modifier.height(18.dp).width(18.dp).padding(end = AppSpacing.sm),
                         strokeWidth = 2.dp,
                     )
                 }
-                Text("Select & save")
+                Text("Save")
             }
+        }
+    }
+}
+
+@Composable
+private fun WorkflowTipsCard() {
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Row(
+            Modifier.padding(AppSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        ) {
+            Icon(
+                Icons.Outlined.TipsAndUpdates,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+            )
+            Text(
+                text = "Link subjects to faculty, keep rooms in sync with Manage, regenerate anytime.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

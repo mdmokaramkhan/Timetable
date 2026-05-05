@@ -17,14 +17,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -40,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import com.mukrram.timetable.data.remote.dto.AnalyticsResponseDto
 import com.mukrram.timetable.data.remote.dto.BatchDto
 import com.mukrram.timetable.data.remote.dto.AnalyticsSummaryDto
@@ -50,7 +46,6 @@ import com.mukrram.timetable.ui.components.AppFilterChip
 import com.mukrram.timetable.ui.components.AppPullToRefreshBox
 import com.mukrram.timetable.ui.components.CenteredLoading
 import com.mukrram.timetable.ui.components.ErrorState
-import com.mukrram.timetable.ui.components.TimetableTopAppBar
 import com.mukrram.timetable.ui.theme.AppSpacing
 import com.mukrram.timetable.ui.viewmodel.AnalyticsViewModel
 
@@ -60,7 +55,6 @@ private fun analyticsCardElevation() = CardDefaults.cardElevation(defaultElevati
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsScreen(
-    navController: NavController,
     modifier: Modifier = Modifier,
     viewModel: AnalyticsViewModel = viewModel(factory = LocalAppViewModelFactory.current),
 ) {
@@ -76,24 +70,6 @@ fun AnalyticsScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TimetableTopAppBar(
-                titleText = "Analytics",
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.refresh() },
-                        enabled = !uiState.loading,
-                    ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
-                    }
-                },
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         AppPullToRefreshBox(

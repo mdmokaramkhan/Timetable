@@ -1,19 +1,12 @@
 package com.mukrram.timetable.ui.timetable
 
+import com.mukrram.timetable.data.remote.TimetableGridDefaults
 import com.mukrram.timetable.data.remote.dto.ScheduleCellDto
 
-/** Default Mon–Fri × S1–S8 grid (matches backend timetable constants). */
-val DefaultTimetableDays: List<String> = listOf(
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-)
+/** Default Mon–Fri × S1–S8 grid (same source as [TimetableGridDefaults]). */
+val DefaultTimetableDays: List<String> = TimetableGridDefaults.DAYS
 
-val DefaultTimetableSlots: List<String> = listOf(
-    "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8",
-)
+val DefaultTimetableSlots: List<String> = TimetableGridDefaults.SLOTS
 
 fun cellAt(
     schedule: Map<String, List<ScheduleCellDto>>,

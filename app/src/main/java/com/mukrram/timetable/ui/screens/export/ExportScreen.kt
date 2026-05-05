@@ -14,12 +14,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -35,14 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import com.mukrram.timetable.ui.LocalAppViewModelFactory
 import com.mukrram.timetable.ui.components.AppButton
 import com.mukrram.timetable.ui.components.AppFilterChip
 import com.mukrram.timetable.ui.components.AppPullToRefreshBox
 import com.mukrram.timetable.ui.components.CenteredLoading
 import com.mukrram.timetable.ui.components.ErrorState
-import com.mukrram.timetable.ui.components.TimetableTopAppBar
 import com.mukrram.timetable.ui.theme.AppSpacing
 import com.mukrram.timetable.ui.util.sharePlainText
 import com.mukrram.timetable.ui.viewmodel.ExportViewModel
@@ -50,7 +45,6 @@ import com.mukrram.timetable.ui.viewmodel.ExportViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportScreen(
-    navController: NavController,
     modifier: Modifier = Modifier,
     viewModel: ExportViewModel = viewModel(factory = LocalAppViewModelFactory.current),
 ) {
@@ -67,24 +61,6 @@ fun ExportScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TimetableTopAppBar(
-                titleText = "Export",
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.refresh() },
-                        enabled = uiState.selectedBatchName != null,
-                    ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
-                    }
-                },
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         AppPullToRefreshBox(

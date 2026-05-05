@@ -50,5 +50,11 @@ sealed class MainDestination(
                 UserRole.Faculty -> Timetable.route
             }
         }
+
+        /** Routes that show the bottom navigation bar (main tabs). */
+        fun isBottomBarRoute(route: String?, session: SessionState): Boolean {
+            if (route == null) return false
+            return bottomBarDestinations(session).any { it.route == route }
+        }
     }
 }

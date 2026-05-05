@@ -81,7 +81,6 @@ import com.mukrram.timetable.ui.components.AppOutlinedTextField
 import com.mukrram.timetable.ui.components.AppPullToRefreshBox
 import com.mukrram.timetable.ui.components.CenteredLoading
 import com.mukrram.timetable.ui.components.EmptyState
-import com.mukrram.timetable.ui.components.TimetableTopAppBar
 import com.mukrram.timetable.ui.theme.AppSpacing
 import com.mukrram.timetable.ui.viewmodel.BatchManageViewModel
 import com.mukrram.timetable.ui.viewmodel.FacultyManageViewModel

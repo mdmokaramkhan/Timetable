@@ -58,7 +58,6 @@ import com.mukrram.timetable.navigation.ExtraRoutes
 import com.mukrram.timetable.ui.LocalAppViewModelFactory
 import com.mukrram.timetable.ui.components.AppButton
 import com.mukrram.timetable.ui.components.AppCard
-import com.mukrram.timetable.ui.components.TimetableTopAppBar
 import com.mukrram.timetable.ui.theme.AppSpacing
 import com.mukrram.timetable.ui.viewmodel.ProfileViewModel
 

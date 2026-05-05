@@ -2,6 +2,7 @@ package com.mukrram.timetable.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mukrram.timetable.data.remote.TimetableGridDefaults
 import com.mukrram.timetable.data.remote.dto.BatchDto
 import com.mukrram.timetable.data.remote.dto.GenerateTimetableRequest
 import com.mukrram.timetable.data.remote.dto.GenerateTimetableResponse
@@ -24,7 +25,10 @@ data class GenerateUiState(
     val counts: DashboardCounts? = null,
     val batches: List<BatchDto> = emptyList(),
     val selectedBatchName: String? = null,
-    val maxClassesPerDayText: String = "",
+    /** Matches server-side default capacity; synced with slider before first edit. */
+    val maxClassesPerDayText: String = "6",
+    /** Backend returns 2–3 option rows; caller should keep in that range. */
+    val optionsCount: Int = 3,
     val generateResult: GenerateTimetableResponse? = null,
     val error: String? = null,
     val saveSuccessMessage: String? = null,
@@ -86,6 +90,11 @@ class GenerateViewModel(
         }
     }
 
+    fun onOptionsCountChange(count: Int) {
+        val c = count.coerceIn(2, 3)
+        _uiState.update { it.copy(optionsCount = c) }
+    }
+
     fun generate() {
         val batch = _uiState.value.selectedBatchName?.trim().orEmpty()
         if (batch.isEmpty()) {
@@ -93,6 +102,7 @@ class GenerateViewModel(
             return
         }
         val maxPerDay = _uiState.value.maxClassesPerDayText.trim().toIntOrNull()
+        val opts = _uiState.value.optionsCount.coerceIn(2, 3)
         viewModelScope.launch {
             _uiState.update {
                 it.copy(loadingGenerate = true, error = null, generateResult = null)
@@ -100,8 +110,10 @@ class GenerateViewModel(
             try {
                 val body = GenerateTimetableRequest(
                     batch = batch,
-                    optionsCount = 3,
+                    optionsCount = opts,
                     maxClassesPerDay = maxPerDay,
+                    days = TimetableGridDefaults.DAYS,
+                    slots = TimetableGridDefaults.SLOTS,
                 )
                 val result = repository.generateTimetable(body)
                 _uiState.update { it.copy(loadingGenerate = false, generateResult = result) }

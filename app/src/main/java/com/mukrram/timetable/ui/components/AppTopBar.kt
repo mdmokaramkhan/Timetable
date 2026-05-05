@@ -8,6 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -22,13 +23,24 @@ fun TimetableTopAppBar(
     modifier: Modifier = Modifier,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
+    /** When set, elevation follows content scroll (shadow only when body scrolls under the bar). */
+    scrollBehavior: TopAppBarScrollBehavior? = null,
+    /** Used only when [scrollBehavior] is null (e.g. nested auth screens). */
     elevation: Dp = 0.dp,
     containerColor: Color = MaterialTheme.colorScheme.surface,
 ) {
-    Surface(
-        modifier = modifier.shadow(elevation),
-        color = containerColor,
-    ) {
+    val barColors = TopAppBarDefaults.topAppBarColors(
+        containerColor = if (scrollBehavior != null) {
+            containerColor
+        } else {
+            Color.Transparent
+        },
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    if (scrollBehavior != null) {
         TopAppBar(
             title = {
                 Text(
@@ -36,16 +48,30 @@ fun TimetableTopAppBar(
                     style = MaterialTheme.typography.titleLarge,
                 )
             },
-            modifier = Modifier.padding(horizontal = 4.dp), // Adding subtle internal horizontal spacing
+            modifier = modifier.padding(horizontal = 4.dp),
             navigationIcon = navigationIcon,
             actions = actions,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent, // Surface handles color
-                titleContentColor = MaterialTheme.colorScheme.onSurface,
-                navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-            scrollBehavior = null,
+            colors = barColors,
+            scrollBehavior = scrollBehavior,
         )
+    } else {
+        Surface(
+            modifier = modifier.shadow(elevation),
+            color = containerColor,
+        ) {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = titleText,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                },
+                modifier = Modifier.padding(horizontal = 4.dp),
+                navigationIcon = navigationIcon,
+                actions = actions,
+                colors = barColors.copy(containerColor = Color.Transparent),
+                scrollBehavior = null,
+            )
+        }
     }
 }
