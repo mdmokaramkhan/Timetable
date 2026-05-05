@@ -1,31 +1,28 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.mukrram.timetable.ui.screens.analytics
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,12 +31,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mukrram.timetable.data.remote.dto.AnalyticsGridDto
 import com.mukrram.timetable.data.remote.dto.AnalyticsResponseDto
-import com.mukrram.timetable.data.remote.dto.BatchDto
 import com.mukrram.timetable.data.remote.dto.AnalyticsSummaryDto
+import com.mukrram.timetable.data.remote.dto.BatchDto
 import com.mukrram.timetable.ui.LocalAppViewModelFactory
 import com.mukrram.timetable.ui.analytics.ScheduleAnalytics
 import com.mukrram.timetable.ui.components.AppFilterChip
@@ -49,10 +47,18 @@ import com.mukrram.timetable.ui.components.ErrorState
 import com.mukrram.timetable.ui.theme.AppSpacing
 import com.mukrram.timetable.ui.viewmodel.AnalyticsViewModel
 
-@Composable
-private fun analyticsCardElevation() = CardDefaults.cardElevation(defaultElevation = 0.dp)
+private fun formatGeneratedAt(raw: String?): String? {
+    val s = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return s.replace('T', ' ').substringBefore('.').substringBefore('Z')
+}
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun percent01Label(ratio: Double): String =
+    "${ratio.coerceIn(0.0, 1.0).times(100).toInt().coerceIn(0, 100)}%"
+
+@Composable
+private fun paneBorder(): BorderStroke =
+    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+
 @Composable
 fun AnalyticsScreen(
     modifier: Modifier = Modifier,
@@ -83,13 +89,12 @@ fun AnalyticsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(AppSpacing.lg),
+                    .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 when {
                     uiState.batches.isEmpty() && uiState.loading && uiState.serverSnapshot == null -> {
-                        CenteredLoading(message = "Loading analytics…")
+                        CenteredLoading(message = "Loading…")
                     }
 
                     uiState.error != null && uiState.serverSnapshot == null && !uiState.loading -> {
@@ -100,106 +105,111 @@ fun AnalyticsScreen(
                     }
 
                     uiState.loading && uiState.serverSnapshot == null && uiState.error == null -> {
-                        CenteredLoading(message = "Loading analytics…")
+                        CenteredLoading(message = "Loading…")
                     }
 
                     uiState.serverSnapshot != null -> {
                         val snap = uiState.serverSnapshot!!
                         val summary = snap.summary ?: AnalyticsSummaryDto()
-                        val sortedFaculty = remember(snap.facultyWorkload) {
+                        val grid = snap.grid ?: AnalyticsGridDto()
+
+                        val facultyPairs =
                             snap.facultyWorkload
                                 .orEmpty()
+                                .filter { it.scheduledSlots > 0 && it.name.isNotBlank() }
                                 .sortedByDescending { it.scheduledSlots }
-                        }
-                        val topFaculty = sortedFaculty.firstOrNull { it.name.isNotBlank() && it.scheduledSlots > 0 }
-                        val topRoom = snap.roomUsage.orEmpty().maxByOrNull { it.scheduledSlots }
+                                .take(8)
+                                .map { it.name to it.scheduledSlots }
+                        val roomPairs =
+                            snap.roomUsage.orEmpty()
+                                .filter { it.scheduledSlots > 0 && it.room.isNotBlank() }
+                                .take(8)
+                                .map { it.room to it.scheduledSlots }
 
-                        ServerOverviewSection(
+                        Text(
+                            text = "Analytics",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        formatGeneratedAt(snap.generatedAt)?.let { t ->
+                            Text(
+                                text = "Updated $t",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        CampusSnapshotPanel(
                             summary = summary,
-                            generatedAt = snap.generatedAt,
-                            topFacultyName = topFaculty?.name.orEmpty(),
-                            topFacultySlots = topFaculty?.scheduledSlots ?: 0,
-                            topRoomName = topRoom?.room.orEmpty(),
-                            topRoomSlots = topRoom?.scheduledSlots ?: 0,
+                            grid = grid,
                         )
 
                         if (!snap.unmappedFacultyInSchedules.isNullOrEmpty()) {
-                            UnmappedFacultyCard(snap)
+                            UnmappedFacultyStrip(snap)
                         }
 
-                        SectionHeader(
-                            title = "Campus workload",
-                            subtitle = "Top signals only for quick decisions",
+                        Text(
+                            text = "Faculty load",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "From all saved timetables vs faculty master list",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (facultyPairs.isNotEmpty()) {
+                            AnalyticsBarList(
+                                title = "",
+                                entries = facultyPairs,
+                                maxItems = 8,
+                                barColor = MaterialTheme.colorScheme.primary,
+                                barTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            )
+                        } else {
+                            Text(
+                                text = "No scheduled classes yet.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                         )
 
-                        val facultyChartPairs = remember(sortedFaculty) {
-                            sortedFaculty
-                                .filter { it.scheduledSlots > 0 }
-                                .take(10)
-                                .map { it.name to it.scheduledSlots }
-                        }
-                        AnalyticsGroupCard(
-                            title = "Faculty load",
-                            subtitle = "Most scheduled faculty this week",
-                            accent = MaterialTheme.colorScheme.primaryContainer,
-                        ) {
-                            TrendHighlightRow(
-                                title = "Most loaded faculty",
-                                detail = if (topFaculty != null) {
-                                    "${topFaculty.name} - ${topFaculty.scheduledSlots} slots"
-                                } else {
-                                    "No scheduled classes yet"
-                                },
+                        Text(
+                            text = "Room usage",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "Share of class assignments across rooms",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (roomPairs.isNotEmpty()) {
+                            AnalyticsBarList(
+                                title = "",
+                                entries = roomPairs,
+                                maxItems = 8,
+                                barColor = MaterialTheme.colorScheme.tertiary,
+                                barTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                             )
-                            if (facultyChartPairs.isNotEmpty()) {
-                                Spacer(Modifier.height(AppSpacing.md))
-                                AnalyticsBarList(
-                                    title = "Top faculty by scheduled slots",
-                                    entries = facultyChartPairs.take(5),
-                                    barColor = MaterialTheme.colorScheme.primary,
-                                    barTrackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                )
-                            } else {
-                                Text(
-                                    "No faculty workload data yet.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
+                        } else {
+                            Text(
+                                text = "No room data yet.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
 
-                        val roomPairs = remember(snap.roomUsage) {
-                            snap.roomUsage.orEmpty().map { it.room to it.scheduledSlots }
-                        }
-                        AnalyticsGroupCard(
-                            title = "Room utilization",
-                            subtitle = "Most used rooms at a glance",
-                            accent = MaterialTheme.colorScheme.tertiaryContainer,
-                        ) {
-                            TrendHighlightRow(
-                                title = "Top assigned room",
-                                detail = if (topRoom != null) {
-                                    "${topRoom.room} - ${topRoom.scheduledSlots} classes"
-                                } else {
-                                    "No room assignments yet"
-                                },
-                            )
-                            if (roomPairs.isNotEmpty()) {
-                                Spacer(Modifier.height(AppSpacing.md))
-                                AnalyticsBarList(
-                                    title = "Top rooms by assignments",
-                                    entries = roomPairs.take(5),
-                                    barColor = MaterialTheme.colorScheme.tertiary,
-                                    barTrackColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
-                                )
-                            } else {
-                                Text(
-                                    "No room usage yet.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                        )
 
                         BatchSection(
                             batches = uiState.batches,
@@ -213,7 +223,7 @@ fun AnalyticsScreen(
 
                     else -> {
                         Text(
-                            text = "Analytics will appear after the server responds.",
+                            text = "Waiting for data…",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -225,241 +235,119 @@ fun AnalyticsScreen(
 }
 
 @Composable
-private fun ServerOverviewSection(
-    summary: AnalyticsSummaryDto?,
-    generatedAt: String?,
-    topFacultyName: String,
-    topFacultySlots: Int,
-    topRoomName: String,
-    topRoomSlots: Int,
+private fun CampusSnapshotPanel(
+    summary: AnalyticsSummaryDto,
+    grid: AnalyticsGridDto,
 ) {
-    val s = summary ?: AnalyticsSummaryDto()
-    SectionHeader(
-        title = "Overview",
-        subtitle = "Quick campus snapshot",
-    )
-    Row(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = paneBorder(),
     ) {
-        StatCard(
-            title = "Saved timetables",
-            value = s.timetableCount.toString(),
-            accent = MaterialTheme.colorScheme.primary,
-            background = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-            modifier = Modifier.weight(1f),
-        )
-        StatCard(
-            title = "Classes scheduled",
-            value = s.totalClassesScheduled.toString(),
-            accent = MaterialTheme.colorScheme.secondary,
-            background = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-            modifier = Modifier.weight(1f),
-        )
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-    ) {
-        StatCard(
-            title = "Free slots (all batches)",
-            value = s.totalFreeSlots.toString(),
-            accent = MaterialTheme.colorScheme.tertiary,
-            background = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
-            modifier = Modifier.weight(1f),
-        )
-        StatCard(
-            title = "Grid utilization",
-            value = formatPercent01(s.overallUtilization),
-            accent = MaterialTheme.colorScheme.primary,
-            background = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-            modifier = Modifier.weight(1f),
-        )
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-    ) {
-        MiniInsightCard(
-            label = "Top faculty",
-            value = if (topFacultySlots > 0) "$topFacultyName · $topFacultySlots" else "No data yet",
-            accent = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
-        )
-        MiniInsightCard(
-            label = "Top room",
-            value = if (topRoomSlots > 0) "$topRoomName · $topRoomSlots" else "No data yet",
-            accent = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.weight(1f),
-        )
-    }
-    if (!generatedAt.isNullOrBlank()) {
-        Text(
-            text = "Snapshot: $generatedAt",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
-private fun SectionHeader(
-    title: String,
-    subtitle: String,
-) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    Text(
-        text = subtitle,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun AnalyticsGroupCard(
-    title: String,
-    subtitle: String,
-    accent: Color,
-    content: @Composable () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
-        elevation = analyticsCardElevation(),
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .background(accent.copy(alpha = 0.85f)),
+        Column(
+            modifier = Modifier.padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
+        ) {
+            Text(
+                text = "Campus snapshot",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
             )
-            Column(Modifier.padding(AppSpacing.lg)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                )
+            val slotLine = when {
+                grid.days > 0 && grid.slotsPerDay > 0 ->
+                    "${grid.days} days × ${grid.slotsPerDay} slots = ${grid.slotsPerBatch} / batch"
+                else -> "Grid dimensions from server"
             }
             Text(
-                subtitle,
+                text = slotLine,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(AppSpacing.md))
-            content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrendHighlightRow(
-    title: String,
-    detail: String,
-) {
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
-        elevation = analyticsCardElevation(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                MetricBlock(
+                    label = "Timetables",
+                    value = summary.timetableCount.toString(),
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    detail,
-                    style = MaterialTheme.typography.titleSmall,
+                MetricBlock(
+                    label = "Classes",
+                    value = summary.totalClassesScheduled.toString(),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricBlock(
+                    label = "Free slots",
+                    value = summary.totalFreeSlots.toString(),
+                    modifier = Modifier.weight(1f),
                 )
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.TrendingUp,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+            FractionBar(
+                label = "Grid fill (all batches)",
+                value = summary.overallUtilization.toFloat().coerceIn(0f, 1f),
+                valueText = percent01Label(summary.overallUtilization),
+                barColor = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             )
         }
     }
 }
 
 @Composable
-private fun MiniInsightCard(
+private fun MetricBlock(
     label: String,
     value: String,
-    accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
-        elevation = analyticsCardElevation(),
+    Column(
+        modifier = modifier.padding(horizontal = AppSpacing.xs),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun UnmappedFacultyStrip(snap: AnalyticsResponseDto) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f)),
     ) {
         Column(Modifier.padding(AppSpacing.md)) {
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "Unmatched names in grids",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer,
             )
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                color = accent,
-                maxLines = 2,
-            )
-        }
-    }
-}
-
-@Composable
-private fun UnmappedFacultyCard(snap: AnalyticsResponseDto) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        ),
-        elevation = analyticsCardElevation(),
-    ) {
-        Column(Modifier.padding(AppSpacing.lg)) {
-            Text(
-                "Names in timetables not matched to Faculty records",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-            Spacer(Modifier.height(AppSpacing.sm))
-            snap.unmappedFacultyInSchedules?.forEach { u ->
+            snap.unmappedFacultyInSchedules?.take(6)?.forEach { u ->
                 Text(
-                    "• ${u.nameKey}: ${u.scheduledSlots} slots",
+                    text = "• ${u.nameKey} · ${u.scheduledSlots} slots",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+            val more = (snap.unmappedFacultyInSchedules?.size ?: 0) - 6
+            if (more > 0) {
+                Text(
+                    text = "+ $more more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
                 )
             }
         }
@@ -476,14 +364,20 @@ private fun BatchSection(
     batchMissing: Boolean,
 ) {
     Text(
-        text = "Per batch",
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.fillMaxWidth(),
+        text = "Selected batch",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    Text(
+        text = "GET timetable/{batch} · slot breakdown from saved grid",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     if (batches.isEmpty()) {
         Text(
-            "No batches defined yet.",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "No batches yet.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         return
@@ -504,151 +398,98 @@ private fun BatchSection(
     }
     val sel = selected ?: return
     val fromApi = server.byBatch.orEmpty().find { it.batch == sel }
-    Card(
+
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        elevation = analyticsCardElevation(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = paneBorder(),
     ) {
-        Column(Modifier.padding(AppSpacing.lg)) {
-            Text(sel, style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(AppSpacing.sm))
+        Column(
+            modifier = Modifier.padding(AppSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        ) {
+            Text(
+                text = sel,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
             if (fromApi != null) {
+                val fill =
+                    if (fromApi.capacitySlots > 0) {
+                        fromApi.scheduledSlots.toFloat() / fromApi.capacitySlots.toFloat()
+                    } else {
+                        0f
+                    }
                 Text(
-                    "Scheduled ${fromApi.scheduledSlots} / ${fromApi.capacitySlots} slots · " +
-                        "${fromApi.freeSlots} free",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "${fromApi.scheduledSlots} scheduled · ${fromApi.freeSlots} free · ${fromApi.capacitySlots} capacity",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FractionBar(
+                    label = "Batch grid fill",
+                    value = fill.coerceIn(0f, 1f),
+                    valueText = percent01Label(fill.toDouble()),
+                    barColor = MaterialTheme.colorScheme.secondary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 )
             }
             when {
                 batchMissing -> {
                     Text(
-                        "No saved timetable for this batch yet. Generate and save one to see slot-level breakdown.",
+                        text = "No saved timetable for this batch. Generate and save one to see faculty and room rows.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = AppSpacing.sm),
                     )
                 }
                 batchAnalytics != null -> {
-                    Spacer(Modifier.height(AppSpacing.md))
-                    Text("This batch — slot breakdown", style = MaterialTheme.typography.labelLarge)
+                    val a = batchAnalytics
+                    Spacer(Modifier.height(AppSpacing.xs))
+                    Text(
+                        text = "This batch — top faculty",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    val fPairs = a.facultyLoad.take(6)
+                    if (fPairs.isNotEmpty()) {
+                        AnalyticsBarList(
+                            title = "",
+                            entries = fPairs,
+                            maxItems = 6,
+                            barColor = MaterialTheme.colorScheme.primary,
+                            barTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        )
+                    } else {
+                        Text(
+                            text = "No faculty assignments",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Spacer(Modifier.height(AppSpacing.sm))
-                    BatchBreakdownCards(batchAnalytics)
+                    Text(
+                        text = "This batch — top rooms",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    val rPairs = a.roomUsage.take(6)
+                    if (rPairs.isNotEmpty()) {
+                        AnalyticsBarList(
+                            title = "",
+                            entries = rPairs,
+                            maxItems = 6,
+                            barColor = MaterialTheme.colorScheme.tertiary,
+                            barTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        )
+                    } else {
+                        Text(
+                            text = "No room assignments",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
     }
 }
-
-@Composable
-private fun BatchBreakdownCards(analytics: ScheduleAnalytics) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
-    ) {
-        StatCard(
-            title = "Scheduled (this batch)",
-            value = analytics.scheduledClasses.toString(),
-            accent = MaterialTheme.colorScheme.primary,
-            background = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-            modifier = Modifier.weight(1f),
-        )
-        StatCard(
-            title = "Free (this batch)",
-            value = analytics.freeSlots.toString(),
-            accent = MaterialTheme.colorScheme.tertiary,
-            background = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
-            modifier = Modifier.weight(1f),
-        )
-    }
-    Text(
-        text = "Grid: ${analytics.totalSlots} slots (Mon–Fri × periods)",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Text(
-        text = "Faculty & room below are for this batch only (from the saved grid).",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = AppSpacing.sm),
-    )
-    analytics.facultyLoad.forEach { (name, n) ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(name, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                n.toString(),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-    }
-    Spacer(Modifier.height(AppSpacing.sm))
-    Text("Rooms (this batch)", style = MaterialTheme.typography.labelLarge)
-    Spacer(Modifier.height(AppSpacing.xs))
-    if (analytics.roomUsage.isEmpty()) {
-        Text(
-            "No assignments",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        analytics.roomUsage.forEach { (room, n) ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(room, style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    n.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-        }
-    }
-}
-
-@Composable
-private fun StatCard(
-    title: String,
-    value: String,
-    accent: Color,
-    background: Color,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = background),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f)),
-        elevation = analyticsCardElevation(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Box(
-                modifier = Modifier
-                    .height(5.dp)
-                    .fillMaxWidth(0.25f)
-                    .background(accent, RoundedCornerShape(50)),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium,
-                color = accent,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-private fun formatPercent01(ratio: Double): String =
-    "%.0f%%".format((ratio * 100).coerceIn(0.0, 100.0))

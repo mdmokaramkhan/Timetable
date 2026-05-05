@@ -1,6 +1,7 @@
 package com.mukrram.timetable.ui.screens.generate
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,10 +16,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.School
@@ -43,7 +44,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,18 +53,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.mukrram.timetable.data.remote.dto.GenerateTimetableResponse
 import com.mukrram.timetable.data.remote.dto.ScheduleCellDto
 import com.mukrram.timetable.data.remote.dto.TimetableOptionDto
 import com.mukrram.timetable.data.repository.DashboardCounts
 import com.mukrram.timetable.navigation.MainDestination
 import com.mukrram.timetable.ui.LocalAppViewModelFactory
 import com.mukrram.timetable.ui.components.AppButton
+import com.mukrram.timetable.ui.components.AppOutlinedButton
 import com.mukrram.timetable.ui.components.AppCard
 import com.mukrram.timetable.ui.components.AppOutlinedTextField
 import com.mukrram.timetable.ui.components.AppPullToRefreshBox
@@ -72,8 +73,7 @@ import com.mukrram.timetable.ui.components.CenteredLoading
 import com.mukrram.timetable.ui.components.EmptyState
 import com.mukrram.timetable.ui.components.ErrorState
 import com.mukrram.timetable.ui.theme.AppSpacing
-import com.mukrram.timetable.ui.timetable.DefaultTimetableDays
-import com.mukrram.timetable.ui.timetable.DefaultTimetableSlots
+import com.mukrram.timetable.ui.timetable.ReadOnlyTimetableGrid
 import com.mukrram.timetable.ui.viewmodel.GenerateViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +86,7 @@ fun GenerateScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var batchMenuExpanded by remember { mutableStateOf(false) }
+    var timetablePreviewDialog by remember { mutableStateOf<GenerateTimetablePreviewDialogData?>(null) }
 
     LaunchedEffect(uiState.error) {
         val err = uiState.error ?: return@LaunchedEffect
@@ -107,6 +108,13 @@ fun GenerateScreen(
             }
         }
         viewModel.consumeSaveMessage()
+    }
+
+    timetablePreviewDialog?.let { dialogData ->
+        GenerateTimetablePreviewDialog(
+            data = dialogData,
+            onDismiss = { timetablePreviewDialog = null },
+        )
     }
 
     Scaffold(
@@ -142,8 +150,8 @@ fun GenerateScreen(
                     }
 
                     else -> {
-                        val gridDayCount = uiState.generateResult?.days?.size ?: DefaultTimetableDays.size
-                        val gridSlotCount = uiState.generateResult?.slots?.size ?: DefaultTimetableSlots.size
+                        val gridDayCount = uiState.generateResult?.days?.size ?: 5
+                        val gridSlotCount = uiState.generateResult?.slots?.size ?: 8
 
                         GenerateHeroSection(
                             onRefresh = { viewModel.refreshSummary() },
@@ -199,7 +207,25 @@ fun GenerateScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
-                            BestOptionPreviewCard(result = result)
+                            val bestOption =
+                                result.options.maxByOrNull { it.stats.placed } ?: result.options.firstOrNull()
+                            if (bestOption != null) {
+                                BestOptionPreviewCard(
+                                    option = bestOption,
+                                    batchName = result.batch,
+                                    saving = uiState.savingOptionId == bestOption.id,
+                                    onSave = { viewModel.selectAndSaveOption(bestOption) },
+                                    onPreview = {
+                                        timetablePreviewDialog = GenerateTimetablePreviewDialogData(
+                                            title = "Draft ${bestOption.id.uppercase()}",
+                                            subtitle = "${result.batch} · ${bestOption.stats.placed}/${bestOption.stats.required} placed",
+                                            days = result.days,
+                                            slots = result.slots,
+                                            schedule = bestOption.schedule,
+                                        )
+                                    },
+                                )
+                            }
 
                             Text(
                                 text = "Choose a draft (${result.options.size})",
@@ -219,6 +245,15 @@ fun GenerateScreen(
                                             option = opt,
                                             saving = uiState.savingOptionId == opt.id,
                                             onSave = { viewModel.selectAndSaveOption(opt) },
+                                            onPreview = {
+                                                timetablePreviewDialog = GenerateTimetablePreviewDialogData(
+                                                    title = "Draft ${opt.id.uppercase()}",
+                                                    subtitle = "${result.batch} · placement ${opt.stats.placed}/${opt.stats.required}",
+                                                    days = result.days,
+                                                    slots = result.slots,
+                                                    schedule = opt.schedule,
+                                                )
+                                            },
                                         )
                                     }
                                 }
@@ -550,25 +585,26 @@ private fun SchedulingSetupCard(
                 }
             }
 
+            Text("Variants", style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Variants", style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-                    FilterChip(
-                        selected = optionsCount == 2,
-                        onClick = { onOptionsCountChange(2) },
-                        label = { Text("2") },
-                    )
-                    FilterChip(
-                        selected = optionsCount == 3,
-                        onClick = { onOptionsCountChange(3) },
-                        label = { Text("3") },
-                    )
-                }
+                FilterChip(
+                    selected = optionsCount == 2,
+                    onClick = { onOptionsCountChange(2) },
+                    label = { Text("2") },
+                    modifier = Modifier.weight(1f),
+                )
+                FilterChip(
+                    selected = optionsCount == 3,
+                    onClick = { onOptionsCountChange(3) },
+                    label = { Text("3") },
+                    modifier = Modifier.weight(1f),
+                )
             }
+
         }
     }
 }
@@ -613,11 +649,18 @@ private fun GenerateCallToActionSection(
 }
 
 @Composable
-private fun BestOptionPreviewCard(result: GenerateTimetableResponse) {
-    val option = result.options.maxByOrNull { it.stats.placed } ?: result.options.firstOrNull()
-    if (option == null) return
-    val dayKey = option.schedule.keys.firstOrNull() ?: return
-    val cells: List<ScheduleCellDto> = option.schedule[dayKey]?.take(4).orEmpty()
+private fun BestOptionPreviewCard(
+    option: TimetableOptionDto,
+    batchName: String,
+    saving: Boolean,
+    onSave: () -> Unit,
+    onPreview: () -> Unit,
+) {
+    val stats = option.stats
+    val pct = remember(stats.placed, stats.required) {
+        val r = stats.required.coerceAtLeast(1).toFloat()
+        (stats.placed / r).coerceIn(0f, 1f)
+    }
 
     AppCard(
         modifier = Modifier.fillMaxWidth(),
@@ -627,29 +670,67 @@ private fun BestOptionPreviewCard(result: GenerateTimetableResponse) {
             Modifier.padding(AppSpacing.md),
             verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Strongest draft · ${option.id.uppercase()}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                ) {
+                    Text(
+                        batchName,
+                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
             Text(
-                text = "${option.id.uppercase()} · ${dayKey.take(3)} snapshot",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
+                text = "Coverage ${stats.placed} / ${stats.required}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (cells.isEmpty()) {
-                Text("No preview rows.", style = MaterialTheme.typography.bodySmall)
-            } else {
-                cells.forEach { cell ->
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                    ) {
-                        Column(Modifier.padding(AppSpacing.sm)) {
-                            Text(cell.subject, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-                            Text(
-                                "${cell.faculty} · ${cell.room}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+            LinearProgressIndicator(
+                progress = { pct },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppButton(
+                    onClick = onSave,
+                    enabled = !saving,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    if (saving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.height(18.dp).width(18.dp).padding(end = AppSpacing.sm),
+                            strokeWidth = 2.dp,
+                        )
                     }
+                    Text("Save")
+                }
+                AppOutlinedButton(
+                    onClick = onPreview,
+                    enabled = !saving,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.GridView, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Preview")
                 }
             }
         }
@@ -661,11 +742,9 @@ private fun RichOptionCard(
     option: TimetableOptionDto,
     saving: Boolean,
     onSave: () -> Unit,
+    onPreview: () -> Unit,
 ) {
     val stats = option.stats
-    val loadLine =
-        stats.facultyLoad?.entries.orEmpty().joinToString(", ") { "${it.key}: ${it.value}" }
-            .ifBlank { "—" }
     val pct = remember(stats.placed, stats.required) {
         val r = stats.required.coerceAtLeast(1).toFloat()
         (stats.placed / r).coerceIn(0f, 1f)
@@ -715,26 +794,33 @@ private fun RichOptionCard(
                     .height(6.dp),
                 trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             )
-            Text("Load", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                loadLine,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-            )
-            AppButton(
-                onClick = onSave,
-                enabled = !saving,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (saving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.height(18.dp).width(18.dp).padding(end = AppSpacing.sm),
-                        strokeWidth = 2.dp,
-                    )
+                AppButton(
+                    onClick = onSave,
+                    enabled = !saving,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    if (saving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.height(18.dp).width(18.dp).padding(end = AppSpacing.sm),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                    Text("Save")
                 }
-                Text("Save")
+                AppOutlinedButton(
+                    onClick = onPreview,
+                    enabled = !saving,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Outlined.GridView, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Preview")
+                }
             }
         }
     }
@@ -764,3 +850,80 @@ private fun WorkflowTipsCard() {
         }
     }
 }
+
+private data class GenerateTimetablePreviewDialogData(
+    val title: String,
+    val subtitle: String,
+    val days: List<String>,
+    val slots: List<String>,
+    val schedule: Map<String, List<ScheduleCellDto>>,
+)
+
+@Composable
+private fun GenerateTimetablePreviewDialog(
+    data: GenerateTimetablePreviewDialogData,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        val screenH = LocalConfiguration.current.screenHeightDp.dp
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 3.dp,
+            shadowElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(AppSpacing.md),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.GridView,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = data.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        Text(
+                            text = data.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close")
+                    }
+                }
+                Spacer(Modifier.height(AppSpacing.sm))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
+                Spacer(Modifier.height(AppSpacing.sm))
+                ReadOnlyTimetableGrid(
+                    days = data.days,
+                    slots = data.slots,
+                    schedule = data.schedule,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = screenH * 0.72f),
+                )
+            }
+        }
+    }
+}
+

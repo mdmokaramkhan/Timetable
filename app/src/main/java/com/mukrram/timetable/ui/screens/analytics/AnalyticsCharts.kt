@@ -40,11 +40,13 @@ fun AnalyticsBarList(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        if (title.isNotBlank()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
         top.forEach { (label, value) ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -55,13 +57,13 @@ fun AnalyticsBarList(
                     text = label,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(132.dp),
+                    modifier = Modifier.width(120.dp),
                     maxLines = 1,
                 )
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(22.dp)
+                        .height(18.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .background(barTrackColor),
                 ) {

@@ -6,6 +6,7 @@ import com.mukrram.timetable.data.remote.dto.AffectedSlotDto
 import com.mukrram.timetable.data.remote.dto.BatchDto
 import com.mukrram.timetable.data.remote.dto.FacultyDto
 import com.mukrram.timetable.data.remote.dto.SubstituteRequest
+import com.mukrram.timetable.data.remote.dto.UnavailableFacultyDto
 import com.mukrram.timetable.data.repository.TimetableRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,8 @@ data class SubstitutionUiState(
     val selectedSlot: AffectedSlotDto? = null,
     val suggestedReplacement: String? = null,
     val alternatives: List<String> = emptyList(),
+    /** From POST /substitute when day/slot given — candidates ruled out by load or conflicts. */
+    val unavailable: List<UnavailableFacultyDto> = emptyList(),
     val replacementOverride: String? = null,
     val error: String? = null,
 )
@@ -76,6 +79,7 @@ class SubstitutionViewModel(
                 selectedSlot = null,
                 suggestedReplacement = null,
                 alternatives = emptyList(),
+                unavailable = emptyList(),
                 replacementOverride = null,
             )
         }
@@ -89,6 +93,7 @@ class SubstitutionViewModel(
                 selectedSlot = null,
                 suggestedReplacement = null,
                 alternatives = emptyList(),
+                unavailable = emptyList(),
                 replacementOverride = null,
             )
         }
@@ -126,6 +131,7 @@ class SubstitutionViewModel(
                 selectedSlot = slot,
                 suggestedReplacement = null,
                 alternatives = emptyList(),
+                unavailable = emptyList(),
                 replacementOverride = null,
             )
         }
@@ -152,11 +158,16 @@ class SubstitutionViewModel(
                         suggestedReplacement = res.suggestedReplacement,
                         alternatives = res.alternatives.orEmpty(),
                         replacementOverride = res.suggestedReplacement,
+                        unavailable = res.unavailable.orEmpty(),
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(loadingSuggestion = false, error = humanMessage(e))
+                    it.copy(
+                        loadingSuggestion = false,
+                        unavailable = emptyList(),
+                        error = humanMessage(e),
+                    )
                 }
             }
         }
@@ -194,6 +205,7 @@ class SubstitutionViewModel(
                         selectedSlot = null,
                         suggestedReplacement = null,
                         alternatives = emptyList(),
+                        unavailable = emptyList(),
                         replacementOverride = null,
                     )
                 }

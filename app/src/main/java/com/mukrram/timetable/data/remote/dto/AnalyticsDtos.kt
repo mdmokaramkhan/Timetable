@@ -2,6 +2,7 @@ package com.mukrram.timetable.data.remote.dto
 
 import com.google.gson.annotations.SerializedName
 
+/** Gson models for `GET /analytics` — field names align with `buildAnalyticsPayload` on the server. */
 data class AnalyticsResponseDto(
     val generatedAt: String? = null,
     val grid: AnalyticsGridDto? = null,

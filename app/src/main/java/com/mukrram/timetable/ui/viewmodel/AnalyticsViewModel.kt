@@ -15,11 +15,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-enum class FacultyWorkloadSort {
-    ByName,
-    ByLoad,
-}
-
 data class AnalyticsUiState(
     val batches: List<BatchDto> = emptyList(),
     val selectedBatchName: String? = null,
@@ -29,7 +24,6 @@ data class AnalyticsUiState(
     val batchScheduleAnalytics: ScheduleAnalytics? = null,
     /** True when the selected batch has no saved timetable (404); not a fatal error. */
     val batchTimetableMissing: Boolean = false,
-    val facultySort: FacultyWorkloadSort = FacultyWorkloadSort.ByLoad,
     val loading: Boolean = false,
     val error: String? = null,
 )
@@ -47,10 +41,6 @@ class AnalyticsViewModel(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
-    }
-
-    fun setFacultySort(sort: FacultyWorkloadSort) {
-        _uiState.update { it.copy(facultySort = sort) }
     }
 
     fun onBatchSelected(name: String) {
